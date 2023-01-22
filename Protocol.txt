@@ -1,0 +1,7 @@
+Msg Protocol is:
+
+#first 10 digits - length of msg.
+#msg code, 3 chr length.
+#msg content
+
+xxxxxxxxxxCOD
