@@ -5,6 +5,11 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import random
 import hashlib
+import socket
+
+
+DEBUG = True
+
 
 BS = 16
 def pad(s): return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
@@ -27,6 +32,35 @@ class AESCipher:
         iv = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         return unpad(cipher.decrypt(enc[16:]))
+    
+
+    def send_msg(self,sock:socket.socket,msg,code : str):
+
+        enc_msg = self.encrypt(code+msg)
+
+        len_msg = str(len(enc_msg)).zfill(10).encode()
+
+        sock.send(len_msg+enc_msg)
+
+        if DEBUG:
+            print("sent>>",code,msg)
+
+
+    def recieve_msg(self,sock:socket.socket):
+        """Return msg code, msg in bytes"""
+        len_msg = int(sock.recv(10))
+
+        #code = str(sock.recv(3))
+
+        enc_msg = sock.recv(len_msg)
+
+        dec_msg = self.decrypt(enc_msg)
+        code,msg = dec_msg[:3], dec_msg[3:]
+
+        if DEBUG:
+            print("recived>>",code.decode(),msg)
+
+        return code.decode(),msg
 
 
 def generate_AESk_fpub(pub_key):
