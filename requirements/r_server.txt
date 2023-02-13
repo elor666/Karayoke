@@ -1,0 +1,9 @@
+pathlib
+pyCryptodome
+youtube-search-python
+pytube
+pydub
+requests
+pathlib
+beautifulsoup4
+spleeter

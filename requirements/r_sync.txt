@@ -1,0 +1,9 @@
+#sync app
+youtube-search-python
+pytube
+pydub
+beautifulsoup4
+requests
+pathlib
+customtkinter
+pygame
