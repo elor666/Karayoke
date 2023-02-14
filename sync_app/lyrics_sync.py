@@ -10,7 +10,7 @@ import os
 
 SONG_PATH = ""
 
-Song_Detail_Dir = "SongDetails"
+Song_Detail_Dir = "SongsDetails"
 
 def create_song_dir(artist_name : str, song_name : str):
     global Song_Detail_Dir
