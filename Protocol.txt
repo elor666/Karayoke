@@ -4,4 +4,25 @@ Msg Protocol is:
 #msg code, 3 chr length.
 #msg content
 
-xxxxxxxxxxCOD
+{xxxxxxxxxx}{COD}{content}
+
+Server msgs:
+------------
+
+{PUB}{public_key} - server sends the RSA public key to the client.
+
+{SUC}{} - server sends success msg to logging/registering.
+
+{SCH}{pickled_list_search} - server sends pickled list of the names of the search result.
+{SCH}{} - server sends nothing - meaning that the search failed.
+
+Client msgs:
+------------
+
+{PUB}{rsa_num} - client sends the rsa encrypted num
+
+{LOG}{username#hashed_password} - client sends logging request with username and hashed password.
+
+{REG}{username#hashed_password} - client sends register request with username and hashed password.
+
+{SCH}{artist_name#song} - client sends search request with the name of the artist and the song.
