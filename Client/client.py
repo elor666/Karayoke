@@ -3,10 +3,15 @@ import threading
 import socket
 import encryption
 import hashlib
+import pickle
+import base64
 
 
 Encryptor = None
 SOCK = socket.socket()
+SONG = None
+LYRICS = None
+TIMES = None
 
 class App(ctk.CTk):
     def __init__(self):
@@ -176,18 +181,177 @@ class LoginPage(ctk.CTkFrame):
         else:
             print("thread ended")
             if self.LOGGED:
-                print("connected to server with")
-                root.switch_frame(HomePage)
+                print("Logged to server")
+                root.switch_frame(SearchPage)
 
 
-class HomePage(ctk.CTkFrame):
+class SearchPage(ctk.CTkFrame):
     def __init__(self, master):
         self.CONNECTING = False
         self.LOGGED = False
+        self.Play = False
+        self.FINISH = False
 
         ctk.CTkFrame.__init__(self, master)
         self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
 
+        title_label = ctk.CTkLabel(self,text="Karayoke", font=("Roboto",100), text_color="#7B2869")
+        title_label.place(anchor='n', relx=0.5, rely=0.1)
+
+        self.artist_entry = ctk.CTkEntry(self,placeholder_text="Artist name",placeholder_text_color="#C85C8E",width=280, height=56,font=("Roboto",21),text_color="#FFBABA")
+        self.song_entry = ctk.CTkEntry(self,placeholder_text="Song name",placeholder_text_color="#C85C8E",width=280, height=56, font=("Roboto",21),text_color="#FFBABA")
+
+        self.artist_entry.place(anchor='e', relx=0.495, rely=0.3)
+        self.song_entry.place(anchor='w', relx=0.505, rely=0.3)
+
+        self.SEARCH = False
+        self.search_button = ctk.CTkButton(self,text="Search", fg_color="#9D3C72", width=56, height=56, hover_color="#C85C8E", command=lambda :self.get_search(master),corner_radius=200,text_color="#FFBABA")
+        self.search_button.place(anchor='e', relx=0.445, rely=0.4)
+
+        self.songs_menu = ctk.CTkOptionMenu(self, values=[],command=self.optionmenu_callback,
+        fg_color="#7B2869", 
+        button_color="#7B2869", 
+        button_hover_color="#C85C8E", 
+        dropdown_fg_color="#9D3C72", 
+        dropdown_hover_color="#C85C8E", 
+        width=250, 
+        height=56, 
+        dropdown_font=("Roboto",21), 
+        text_color="#FFBABA")
+
+        self.songs_menu.set("")
+        
+        self.songs_menu.place(anchor="w", relx=0.455, rely=0.4)
+
+        self.no_vocals = ctk.BooleanVar()
+
+        self.vocals_check = ctk.CTkCheckBox(self,text="No Vocals", variable=self.no_vocals, onvalue=True, offvalue=False,
+        checkmark_color="#FFBABA", fg_color="#7B2869",font=("Roboto",21),text_color="#C85C8E")
+
+        self.vocals_check.place(anchor="center", relx=0.5, rely=0.5)
+
+        self.play_button = ctk.CTkButton(self,text="Play Song", fg_color="#7B2869", command=lambda :self.get_song_details(master),width=280, height=56,hover_color="#9D3C72",text_color="#FFBABA")
+        self.play_button.place(anchor="center", relx=0.5, rely=0.6)
+
+        self.choice = ""
+        self.values = []
+
+    def get_search(self,root):
+        if not self.SEARCH:
+            self.SEARCH = True
+
+            self.songs_menu.set("")
+            self.choice = ""
+            self.songs_menu.configure(values="")
+            self.values = []
+
+            artist = self.artist_entry.get().lower()
+            song = self.song_entry.get().lower()
+
+            if all(ch not in "#" for ch in artist) and all(ch not in "#" for ch in song):
+                Encryptor.send_msg(SOCK,f"{artist}#{song}","SCH")
+                search_thread = threading.Thread(target=self.get_lst_songs)
+                search_thread.start()
+
+                self.after(1500,self.try_end_search,search_thread,root)
+   
+                print("Wait for thread to finish" if self.SEARCH else "")
+    
+    def try_end_search(self,search_thread,root):
+        search_thread.join(timeout=0.2)
+
+        if search_thread.is_alive():
+            self.after(500,self.try_end_search,search_thread,root)
+        else:
+            self.SEARCH = False
+            print("thread ended")
+            if self.FINISH:
+                root.switch_frame(KarayokePage)
+
+    def get_lst_songs(self):
+        code, msg = Encryptor.recieve_msg(SOCK)
+        try:
+            if code == "SCH":
+                msg = base64.b64decode(msg)
+                search_results = pickle.loads(msg)
+                self.songs_menu.configure(values=search_results)
+                self.values = search_results
+            else:
+                self.songs_menu.set("")
+                self.choice = ""
+                self.songs_menu.configure(values="")
+                self.values = search_results
+        except:
+            print("Error")
+
+    
+    def optionmenu_callback(self,choice):
+        print("optionmenu clicked:", choice)
+        self.choice = choice
+    
+
+    def get_song_details(self,root):
+        if not self.Play:
+            self.Play = True
+
+            search_thread = threading.Thread(target=self.get_song)
+            search_thread.start()
+
+            self.after(1500,self.try_end_search,search_thread,root)
+   
+            print("Wait for thread to finish" if self.Play else "")
+
+    def get_song(self):
+        Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"RES")
+        try:
+            code, msg = Encryptor.recieve_msg(SOCK)
+            if code == "RES":
+                msg = base64.b64decode(msg)
+                file = pickle.loads(msg)
+                with open("temp.ogg","wb") as f:
+                    f.write(file.read())
+            else:
+                raise Exception("Error")
+            code, msg = Encryptor.recieve_msg(SOCK)
+            if code == "SYC":
+                if msg == "1":
+                    sync = True
+                    code, msg = Encryptor.recieve_msg(SOCK)
+                    if code == "TIM":
+                        msg = base64.b64decode(msg)
+                        times = pickle.loads(msg) #List of times
+                        print(times)
+                    else:
+                        raise Exception("Error")
+                else:
+                    sync = False
+                print(sync)
+            else:
+                raise Exception("Error")
+
+            code, msg = Encryptor.recieve_msg(SOCK)
+            if code == "LYC":
+                msg = base64.b64decode(msg)
+                lyrics = pickle.loads(msg) #List of lyrics
+                print(lyrics)
+            else:
+                raise Exception("Error")
+            
+            self.FINISH = True
+        except:
+            print("Error")
+
+        self.Play = False
+
+
+class KarayokePage(ctk.CTkFrame):
+    def __init__(self, master):
+        self.CONNECTING = False
+        self.LOGGED = False
+        self.Play = False
+
+        ctk.CTkFrame.__init__(self, master)
+        self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
 
 if __name__ == "__main__":
     app = App()
