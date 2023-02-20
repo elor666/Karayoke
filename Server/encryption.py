@@ -34,9 +34,11 @@ class AESCipher:
         return unpad(cipher.decrypt(enc[16:]))
     
 
-    def send_msg(self,sock:socket.socket,msg,code : str):
+    def send_msg(self,sock:socket.socket,msg : str,code : str):
 
         enc_msg = self.encrypt(code+msg)
+
+        print(enc_msg)
 
         len_msg = str(len(enc_msg)).zfill(10).encode()
 
