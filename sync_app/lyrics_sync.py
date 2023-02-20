@@ -1,8 +1,6 @@
 import customtkinter as tk
 import pygame
-from youtube_lyrics import get_song_text
-from pydub import AudioSegment
-from io import BytesIO
+from youtube_lyrics import search_result,download_song_lyrics
 import os
 
 
@@ -11,39 +9,56 @@ import os
 SONG_PATH = ""
 
 Song_Detail_Dir = "SongsDetails"
-
 def create_song_dir(artist_name : str, song_name : str):
     global Song_Detail_Dir
     if not os.path.exists(f"{Song_Detail_Dir}\\{artist_name.lower()} {song_name.lower()}"):
         os.makedirs(f"{Song_Detail_Dir}\\{artist_name.lower()} {song_name.lower()}")
 
     Song_Detail_Dir = f"{Song_Detail_Dir}\\{artist_name.lower()} {song_name.lower()}"
-    
 
-class App(tk.CTk):
+
+class SyncApp(tk.CTk):
     def __init__(self):
-        super().__init__()
-
+        tk.set_appearance_mode("dark")
+        #ctk.set_default_color_theme("dark-blue")
+        tk.CTk.__init__(self)
+        self.state("zoomed")#('-fullscreen', True)
         self.title("Music Player")
-        self.geometry('1200x500')
+        #self.geometry('1980x1080')
+        self._frame = None
+        self.switch_frame(SearchPage)
+        self.bind('<exit>',self.quit())
+
+    def switch_frame(self, frame_class):
+        """Destroys current frame and replaces it with a new one."""
+        new_frame = frame_class(self)
+        if self._frame is not None:
+            self._frame.destroy()
+        self._frame = new_frame
+    
+    
+ 
+
+class SyncPage(tk.CTkFrame):
+    def __init__(self,master):
+        tk.CTkFrame.__init__(self, master)
+        self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
         self.PAUSE = False
         self.STOP = True
         self.start = 0
-        self.file_object = BytesIO()
-        self.song = AudioSegment.from_mp3(SONG_PATH)
 
         play_button = tk.CTkButton(self, text="Play", command=self.play_music)
         stop_button = tk.CTkButton(self, text="Stop", command=self.stop_music)
         pause_button = tk.CTkButton(self, text="Pause", command=self.pause_music)
-        save_button = tk.CTkButton(self, text="Save", command=self.save)
+        self.save_button = tk.CTkButton(self, text="Save", command=self.save,text_color_disabled="#A9A9A9")
 
         play_button.place(anchor='se',relx=0.53,rely=0.90,relwidth=0.025)
         stop_button.place(anchor='sw',relx=0.44,rely=0.90,relwidth=0.025)
         pause_button.place(anchor='sw',relx=0.47,rely=0.90,relwidth=0.025)
-        save_button.place(anchor='se',relx=0.56,rely=0.90,relwidth=0.025)
+        self.save_button.place(anchor='se',relx=0.56,rely=0.90,relwidth=0.025)
 
         
-        self.file_path = "lyrics.txt"
+        self.file_path = Song_Detail_Dir+"\\lyrics.txt"
         self.text_lines = []
         
         with open(self.file_path, 'r') as f:
@@ -69,7 +84,7 @@ class App(tk.CTk):
         self.slider.place(anchor="nw",relx="0",rely="0.1",relheight=0.5)
         
         self.bind("<MouseWheel>", self.mouse_scroll)
-        self.bind("<Down>", self.move_line)
+        master.bind("<Down>", self.move_line)
 
         pygame.mixer.init()
 
@@ -87,7 +102,6 @@ class App(tk.CTk):
         self.STOP = False
         if not pygame.mixer.music.get_busy():
             if not self.PAUSE:
-                pygame.mixer.music.load(SONG_PATH)
                 pygame.mixer.music.play()
             else:
                 pygame.mixer.music.unpause()
@@ -98,21 +112,15 @@ class App(tk.CTk):
             self.index_line = index
             index = float(self.times[index])
             if index != 0:
-                #pygame.mixer.music.set_pos(index)
                 self.start = index
                 self.move_line(None)
-                #pygame.mixer.music.unload()
-                self.write_temp(index)
-                pygame.mixer.music.load(self.file_object,"mp3")
-                pygame.mixer.music.play()
+                pygame.mixer.music.play(start=index)
 
     def stop_music(self):
-        pygame.mixer.music.unload()
+        pygame.mixer.music.stop()
         self.STOP = True
         self.PAUSE = False
         self.index_line = 0
-        #self.time_slider.set(0)
-        #pygame.mixer.music.play(start=0)
         self.slider.set(0)
         self.update_labels(0)
 
@@ -121,9 +129,11 @@ class App(tk.CTk):
         self.PAUSE = True
 
     def save(self):
+        self.save_button.configure(state='disable')
         with open(f"{Song_Detail_Dir}\\times.txt","w") as f:
             for line in self.times:
                 f.write(line+"\n")
+        self.save_button.configure(state='normal')
 
     def add_pos(self,index):
         self.times[index]=str(round(float(self.times[index])+0.01,3))
@@ -184,21 +194,111 @@ class App(tk.CTk):
             self.slider.set(min(self.index_line,len(self.text_lines) - 5))
             self.update_labels(min(self.index_line,len(self.text_lines) - 5))
             self.index_line+=1
+
+class SearchPage(tk.CTkFrame):
+    def __init__(self, master):
+        tk.CTkFrame.__init__(self, master)
+        self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
+        self.artist_entry = tk.CTkEntry(self, placeholder_text="Artist", width=280, height=56, placeholder_text_color="#C85C8E", font=("Roboto",21))
+        self.artist_entry.place(anchor='center', relx=0.2, rely=0.3)
+
+        self.song_entry = tk.CTkEntry(self, placeholder_text="Song", width=280, height=56, placeholder_text_color="#C85C8E", font=("Roboto",21))
+        self.song_entry.place(anchor='center', relx=0.2, rely=0.4)
+        
+        self.values = []
+        self.choice = ""
+
+        self.songs_menu = tk.CTkOptionMenu(self, values=[],command=self.optionmenu_callback,
+        fg_color="#7B2869", 
+        button_color="#7B2869", 
+        button_hover_color="#C85C8E", 
+        dropdown_fg_color="#9D3C72", 
+        dropdown_hover_color="#C85C8E", 
+        width=250, 
+        height=56, 
+        dropdown_font=("Roboto",21), 
+        text_color="#FFBABA")
+
+        self.songs_menu.set("")
+        
+        self.songs_menu.place(anchor="center", relx=0.2, rely=0.5)
+
+        self.SEARCH = False
+        self.search_button = tk.CTkButton(self,text="Search", fg_color="#9D3C72", width=56, height=56, hover_color="#C85C8E", command=lambda :self.get_search(),corner_radius=200,text_color="#FFBABA")
+        self.search_button.place(anchor='e', relx=0.19, rely=0.6)
+
+        self.CAN_SYNC = False
+        self.sync_button = tk.CTkButton(self,text="Sync", fg_color="#9D3C72", width=56, height=56, hover_color="#C85C8E", command=lambda :self.get_sync(master),corner_radius=200,text_color="#FFBABA")
+        self.sync_button.place(anchor='w', relx=0.21, rely=0.6)
+
+        self.labels = [tk.CTkLabel(self,text="", font=("Roboto",24), text_color="#FFBABA") for i in range(5)]
+
+        for i,label in enumerate(self.labels):
+            label.place(anchor='n', relx=0.7, rely=0.2+0.1*i)
+
+    def optionmenu_callback(self,choice):
+        print("optionmenu clicked:", choice)
+        self.choice = choice
     
 
-    def write_temp(self,start):
-        self.file_object = BytesIO()
-        self.song[start*1000:].export(self.file_object,format="mp3")
-        self.file_object.seek(0)
+    def insert_results(self,result):
+        for i,res in enumerate(result):
+            self.labels[i].configure(text=res)
+        
+        if len(result)<len(self.labels):
+            for i in range(len(result),len(self.labels)):
+                self.labels[i].configure(text="")
+
+    
+    def get_search(self):
+        self.SEARCH = True
+        artist = self.artist_entry.get().lower()
+        song = self.song_entry.get().lower()
+        result = search_result(artist,song)
+        if result != []:
+            if not f"{artist} {song}" in result:
+                #print(result)
+                self.values = result
+                self.songs_menu.configure(values=self.values)
+                self.insert_results(result)
+            else:
+                [self.labels[i].configure(text="Can Sync") if i == 0 else self.labels[i].configure(text="") for i in range(len(self.labels))]
+                self.CAN_SYNC = True
+    
+    def get_sync(self,root):
+        if self.SEARCH:
+            print("check if needs download")
+            if self.CAN_SYNC or self.choice != "":
+                print("choice",self.choice)
+                artist = self.artist_entry.get().lower()
+                song = self.song_entry.get().lower()
+                if self.choice != "":
+                    index = self.values.index(self.choice)
+                    download_song_lyrics(artist,song,int(index))
+                    self.CAN_SYNC = True
+                if self.CAN_SYNC:
+                    global SONG_PATH
+                    create_song_dir(artist,song)
+                    SONG_PATH = "Songs\\"+artist.lower()+" "+song.lower()+".ogg"
+
+                    root.switch_frame(SyncPage)
 
 
+"""artist = "stellar"
+song = "cold outside"
 
-artist = "onerepublic"
-song = "I aint worried"
-
-if get_song_text(artist,song):
+result = search_result(artist,song)
+if result != []:
+    if not f"{artist} {song}" in result:
+        print(result)
+        index = input("Index:")
+        download_song_lyrics(artist,song,int(index))
     create_song_dir(artist,song)
-    SONG_PATH = "songs\\"+artist.lower()+" "+song.lower()+".mp3"
+    SONG_PATH = "Songs\\"+artist.lower()+" "+song.lower()+".ogg"
 
-    app = App()
+    app = SyncApp()
     app.mainloop()
+else:
+    print("Error")"""
+app = SyncApp()
+app.mainloop()
