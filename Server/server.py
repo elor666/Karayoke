@@ -2,6 +2,11 @@ import socket
 import threading
 import encryption
 from database import DataBase
+from lyrics import search_result,download_song_lyrics
+import pickle
+import base64
+from io import BytesIO
+from pathlib import Path
 
 FINISH = False
 DATA_BASE = None
@@ -24,39 +29,120 @@ def encrypt_connection(sock:socket.socket):
     return False
 
 
-def login_register(sock: socket.socket,encryptor : encryption.AESCipher):
+def login_register_loop(sock: socket.socket,encryptor : encryption.AESCipher):
   global DATA_BASE
   finish = False
-
-  while not finish:
-    cod,msg = encryptor.recieve_msg(sock)
-    if cod == "LOG":
-      user,password = msg.decode().split("#")
-      res = DATA_BASE.login(user,password)
-      print(res)
-    elif cod == "REG":
-      user,password = msg.decode().split("#")
-      res = DATA_BASE.register(user,password)
-    else:
-      encryptor.send_msg(sock,"","FAL")
-    if res:
-      print(user,password,res)
-      encryptor.send_msg(sock,"","SUC")
-      finish = True
-    else:
-      encryptor.send_msg(sock,"","FAL")
+  try:
+    while not finish:
+      cod,msg = encryptor.recieve_msg(sock)
+      if cod == "LOG":
+        user,password = msg.decode().split("#")
+        res = DATA_BASE.login(user,password)
+        print(res)
+      elif cod == "REG":
+        user,password = msg.decode().split("#")
+        res = DATA_BASE.register(user,password)
+      else:
+        encryptor.send_msg(sock,"","FAL")
+      if res:
+        print(user,password,res)
+        encryptor.send_msg(sock,"","SUC")
+        finish = True
+      else:
+        encryptor.send_msg(sock,"","FAL")
+  except Exception as err:
+    print(err)
+    return False
   
   return True
 
-def handle_client(sock:socket.socket):
+def get_fileobject(out_file):
+  file_object = BytesIO()
+  with open(out_file,"rb") as file:
+    file_object.write(file.read())
 
+    print("File opened")
+
+    file_object.seek(0)
+
+    pickled_file = base64.b64encode(pickle.dumps(file_object)).decode()
+
+    return pickled_file
+
+def get_times(times_path):
+  with open(times_path,"r") as f:
+    time_list = f.readlines()
+    time_list = [float(time[:-1]) if time[-1]=='\n' else float(time) for time in time_list]
+  return base64.b64encode(pickle.dumps(time_list)).decode()
+
+
+def get_lyr(path):
+  with open(path,"r") as f:
+    lyrics = f.readlines()
+  lyrics = [line[:-1] if line[-1]=='\n' else line for line in lyrics if line != "\n"]
+  return base64.b64encode(pickle.dumps(lyrics)).decode()
+
+def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
+  artist = ""
+  song = ""
+  MY_SONG = False
+  while True:
+    code,msg = encryptor.recieve_msg(sock)
+    if code == "SCH":
+      msg = msg.decode()
+      artist,song = msg.split("#")
+      result = search_result(artist,song)
+      if f"{artist} {song}" in result:
+        MY_SONG = True
+      else:
+        MY_SONG = False
+      print(result,MY_SONG)
+      encryptor.send_msg(sock,base64.b64encode(pickle.dumps(result)).decode(),"SCH")
+    if code == "RES":
+      msg = int(msg)
+      if not MY_SONG:
+        out_file = download_song_lyrics(artist,song,msg)
+      else:
+        out_file = f"Songs\\{artist} {song}.ogg"
+      if out_file:
+        pickled_file = get_fileobject(out_file)
+
+        print("File pickled")
+
+        encryptor.send_msg(sock,pickled_file,"RES")
+        if Path(f"SongsDetails\\{artist} {song}\\times.txt").is_file():
+          encryptor.send_msg(sock,"1","SYC")
+          times = get_times(f"SongsDetails\\{artist} {song}\\times.txt")
+          encryptor.send_msg(sock,times,"TIM")
+        else:
+          encryptor.send_msg(sock,"0","SYC")
+        
+        lyrics = get_lyr(f"SongsDetails\\{artist} {song}\\lyrics.txt")
+        encryptor.send_msg(sock,lyrics,"LYC")
+
+        return True
+
+
+def handle_client(sock:socket.socket):
   print("started to handle client")
-  encryptor = encrypt_connection(sock)
-  if not encryptor:
-    print("faild to encrypt")
-  else:
+  try:
+    encryptor = encrypt_connection(sock)
+    if not encryptor:
+      raise Exception("Faild to Encrypt")
+    
     print("Connected to client with", encryptor)
-    print(login_register(sock,encryptor))
+    
+    if not login_register_loop(sock,encryptor):
+      raise Exception("Faild to Login")
+
+    if not song_search_loop(sock,encryptor):
+      raise Exception("Search Error")
+
+    print("Client logged to the server")
+
+  except Exception as err:
+    print(err)
+    
 
 
 def client_disconnect(threads):
