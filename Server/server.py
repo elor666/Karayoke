@@ -119,8 +119,8 @@ def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
         
         lyrics = get_lyr(f"SongsDetails\\{artist} {song}\\lyrics.txt")
         encryptor.send_msg(sock,lyrics,"LYC")
-
-        return True
+    if code=="EXT":
+      return True
 
 
 def handle_client(sock:socket.socket):
