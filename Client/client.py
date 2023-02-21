@@ -5,6 +5,10 @@ import encryption
 import hashlib
 import pickle
 import base64
+import pygame
+from math import floor,ceil
+import io
+from io import BytesIO
 
 
 Encryptor = None
@@ -12,6 +16,8 @@ SOCK = socket.socket()
 SONG = None
 LYRICS = None
 TIMES = None
+IS_SYNC = False
+LINE_COUNT = 7
 
 class App(ctk.CTk):
     def __init__(self):
@@ -266,7 +272,10 @@ class SearchPage(ctk.CTkFrame):
             self.SEARCH = False
             print("thread ended")
             if self.FINISH:
-                root.switch_frame(KarayokePage)
+                if IS_SYNC:
+                    root.switch_frame(KarayokePage)
+                else:
+                    root.switch_fram(KarayokePageNO)
 
     def get_lst_songs(self):
         code, msg = Encryptor.recieve_msg(SOCK)
@@ -302,44 +311,47 @@ class SearchPage(ctk.CTkFrame):
             print("Wait for thread to finish" if self.Play else "")
 
     def get_song(self):
+        global SONG,LYRICS,TIMES,IS_SYNC
         Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"RES")
         try:
             code, msg = Encryptor.recieve_msg(SOCK)
             if code == "RES":
                 msg = base64.b64decode(msg)
-                file = pickle.loads(msg)
-                with open("temp.ogg","wb") as f:
-                    f.write(file.read())
+                SONG = pickle.loads(msg)
+                print(SONG)
             else:
-                raise Exception("Error")
+                raise Exception("ErrorRES")
             code, msg = Encryptor.recieve_msg(SOCK)
             if code == "SYC":
-                if msg == "1":
+                if msg == b"1":
                     sync = True
                     code, msg = Encryptor.recieve_msg(SOCK)
                     if code == "TIM":
                         msg = base64.b64decode(msg)
-                        times = pickle.loads(msg) #List of times
-                        print(times)
+                        TIMES = pickle.loads(msg) #List of times
+                        print(TIMES)
                     else:
-                        raise Exception("Error")
+                        raise Exception("ErrorTIMES")
                 else:
                     sync = False
+                
+                IS_SYNC = sync
                 print(sync)
             else:
-                raise Exception("Error")
+                raise Exception("ErrorSYNC")
 
             code, msg = Encryptor.recieve_msg(SOCK)
+            print(code)
             if code == "LYC":
                 msg = base64.b64decode(msg)
-                lyrics = pickle.loads(msg) #List of lyrics
-                print(lyrics)
+                LYRICS = pickle.loads(msg) #List of lyrics
+                print(LYRICS)
             else:
-                raise Exception("Error")
+                raise Exception("ErrorLYRICS")
             
             self.FINISH = True
-        except:
-            print("Error")
+        except Exception as err:
+            print(err)
 
         self.Play = False
 
@@ -349,9 +361,139 @@ class KarayokePage(ctk.CTkFrame):
         self.CONNECTING = False
         self.LOGGED = False
         self.Play = False
-
+        global SONG,LYRICS,TIMES,LINE_COUNT
         ctk.CTkFrame.__init__(self, master)
         self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
+        self.text_lines = []
+
+        filee_copy = io.BytesIO(SONG.getvalue())
+
+        pygame.mixer.init()
+        pygame.mixer.music.load(SONG,'ogg')
+
+        SONG.seek(0)
+
+        self.text_lines = LYRICS
+        #print(self.text_lines)
+
+        self.times = TIMES
+
+        self.labels = [ctk.CTkLabel(self, text=line,font=('Roboto',40)) for line in self.text_lines[:LINE_COUNT]]
+        for i,label in enumerate(self.labels):
+            label.place(anchor="w",relx=0.1,rely=0.15+0.075*i)
+        
+
+        self.play_button = ctk.CTkButton(self, text="Play", command=self.play_music)
+        self.pause_button = ctk.CTkButton(self, text="Pause", command=self.pause_music)
+
+        self.play_button.place(anchor='se',relx=0.53,rely=0.90,relwidth=0.025)
+        self.pause_button.place(anchor='sw',relx=0.47,rely=0.90,relwidth=0.025)
+
+        audio_length = pygame.mixer.Sound(filee_copy).get_length()
+
+        self.time_slider = ctk.CTkSlider(self, from_=0, to=audio_length, orientation="horizontal",command=self.update_start)#, number_of_steps=round(audio_length//0.1)
+        self.time_slider.set(pygame.mixer.music.get_pos())
+        self.time_slider.place(anchor="n",relx=0.5,rely=0.90,relwidth=0.7)
+        #print(self.time_slider.get(),audio_length)
+        self.start = 0
+
+        self.boldid = None
+        #self.after_cancel(self.afterid)
+
+        self.update_slider()
+    
+    def get_time_index(self,cur_time):
+        if cur_time <= self.times[0]:
+            return 0
+        elif cur_time >= self.times[-1]:
+            return len(self.times)-1
+        for i in range(len(self.times)-1):
+            if cur_time >= self.times[i] and cur_time < self.times[i+1]:
+                return i
+    
+    def get_time_range(self,index,cur_time : float):
+        if self.times[index]<=cur_time:
+            return cur_time-self.times[index]
+        elif self.times[-1]<cur_time:
+            return 0
+        else:
+            return self.times[index]-cur_time
+
+    def update_labels(self):
+        cur_time = self.time_slider.get()
+        value = self.get_time_index(cur_time)
+        if value>floor(LINE_COUNT/2) and value<=len(self.text_lines)-ceil(LINE_COUNT/2):
+            for i in range(LINE_COUNT):
+                self.labels[i].configure(text=self.text_lines[value-floor(LINE_COUNT/2) + i])
+        if value<=floor(LINE_COUNT/2):
+            for i in range(LINE_COUNT):
+                self.labels[i].configure(text=self.text_lines[i])
+        elif value>len(self.text_lines)-ceil(LINE_COUNT/2):
+            for i in range(LINE_COUNT):
+                self.labels[i].configure(text=self.text_lines[len(self.text_lines)-LINE_COUNT+i])
+        self.bold_line(value)
+        if value < len(self.text_lines)-1:
+            if pygame.mixer.music.get_busy():
+                self.boldid = self.after((int((self.get_time_range(value+1,cur_time)))*1000),self.update_labels)
+    
+    def play_music(self):
+        if not pygame.mixer.music.get_busy():
+            cur_time = self.time_slider.get()
+            index = self.get_time_index(cur_time)
+            if index == 0:
+                self.boldid = self.after(int(self.get_time_range(index,cur_time)*1000),self.update_labels)#int(self.get_time_range(self.get_time_index(cur_time),cur_time)*1000)
+            else:
+                self.boldid = self.after(0,self.update_labels)
+                
+            SONG.seek(0)
+            pygame.mixer.music.play(start=self.time_slider.get())
+
+    def pause_music(self):
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.pause()
+            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+            self.start = self.start+pygame.mixer.music.get_pos()/1000
+            pygame.mixer.music.stop()
+            self.after_cancel(self.boldid)
+
+    def update_slider(self):
+        if pygame.mixer.music.get_busy():
+            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+        self.after(10,self.update_slider)
+    
+    def update_start(self,value):
+        if not pygame.mixer.music.get_busy():
+            self.start = value
+            if not self.time_slider.get()<self.times[0]:
+                self.update_labels()
+            else:
+                [label.configure(text_color="white",font=('Roboto',40)) for label in self.labels]
+
+    def calculate_index(self,index):
+        if index <=floor(LINE_COUNT/2):
+            return index
+        elif index >floor(LINE_COUNT/2) and index<len(self.text_lines)-floor(LINE_COUNT/2):
+            return floor(LINE_COUNT/2)
+        else:
+            return LINE_COUNT-(len(self.text_lines)-index)
+
+    def bold_line(self,index):
+        #gets index of line in text_lines
+        if index<len(self.text_lines):
+            index = self.calculate_index(index)
+            [label.configure(text_color="pink",font=('Roboto',40)) if i<index else label.configure(text_color="white",font=('Roboto',40)) for i,label in enumerate(self.labels)]
+            self.labels[index].configure(text_color="red",font=('Roboto',53))
+
+
+class KarayokePageNO(ctk.CTkFrame):
+    def __init__(self, master):
+        self.CONNECTING = False
+        self.LOGGED = False
+        self.Play = False
+        global SONG,LYRICS,TIMES,LINE_COUNT
+        ctk.CTkFrame.__init__(self, master)
+        self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
+
 
 if __name__ == "__main__":
     app = App()
