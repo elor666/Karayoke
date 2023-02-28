@@ -39,8 +39,6 @@ class ConnectPage(ctk.CTkFrame):
     def __init__(self, master):
         global SOCK
         self.sock = SOCK
-        self.CONNECTING = False
-
 
 
         ctk.CTkFrame.__init__(self, master)
@@ -56,14 +54,19 @@ class ConnectPage(ctk.CTkFrame):
         port_entry.place(anchor='center', relx=0.5, rely=0.4)
 
         #connect_func = partial(connect_server, root, ip_entry, port_entry)
-        connect_button = ctk.CTkButton(self, command=lambda: self.connect_server(master,ip_entry,port_entry), text="Connect", fg_color="#7B2869", width=280, height=60, hover_color="#9D3C72")
+        self.connect_button = ctk.CTkButton(self, command=lambda: self.connect_server(master,ip_entry,port_entry),
+            text="Connect",
+            fg_color="#7B2869",
+            width=280,
+            height=60,
+            hover_color="#9D3C72")#"disabled"
             
-        connect_button.place(anchor='n', relx=0.5, rely=0.5)
+        self.connect_button.place(anchor='n', relx=0.5, rely=0.5)
 
         #ctk.CTkButton(self, text="Open page one", command=lambda: master.switch_frame(PageOne)).place(anchor='n', relx=0.5, rely=0.5)
     
     def connect_server(self,root : ctk.CTk,ip_entry, port_entry):
-        if not self.CONNECTING:
+            self.connect_button.configure(state=ctk.DISABLED, fg_color="#808080")
             ip = "127.0.0.1" #ip_entry.get()
             port = "12000"#port_entry.get()
             
@@ -74,8 +77,6 @@ class ConnectPage(ctk.CTkFrame):
                 print(ip, port)
             else:
                 print("Error")
-        else:
-            print("wait for connection thread to finish")
 
     
     def conclude_connection(self,root, thread : threading.Thread):
@@ -83,9 +84,10 @@ class ConnectPage(ctk.CTkFrame):
         thread.join(timeout=0.2)
 
         if thread.is_alive():
-            root.after(1500,self.conclude_connection,root,thread)
+            root.after(500,self.conclude_connection,root,thread)
         else:
             print("thread ended")
+            self.connect_button.configure(state=ctk.NORMAL, fg_color="#7B2869")
             if Encryptor != None:
                 print("connected to server with", Encryptor)
                 root.switch_frame(LoginPage)
@@ -94,7 +96,6 @@ class ConnectPage(ctk.CTkFrame):
     def try_connection(self,ip : str, port : int):
         global Encryptor
         
-        self.CONNECTING = True
         try:
             self.sock.connect((ip,port))
 
@@ -110,13 +111,10 @@ class ConnectPage(ctk.CTkFrame):
         except:
             print("Server not found")
             Encryptor = None
-        
-        self.CONNECTING = False
 
 
 class LoginPage(ctk.CTkFrame):
     def __init__(self, master):
-        self.CONNECTING = False
         self.LOGGED = False
 
         ctk.CTkFrame.__init__(self, master)
@@ -127,37 +125,39 @@ class LoginPage(ctk.CTkFrame):
 
         self.user_entry = ctk.CTkEntry(self, placeholder_text="UserName", width=280, height=56, placeholder_text_color="#C85C8E", font=("Roboto",21))
         self.user_entry.place(anchor='center', relx=0.5, rely=0.3)
-        
+        self.user_entry.get()
 
         self.password_entry = ctk.CTkEntry(self, placeholder_text="Password", width=280, height=56, placeholder_text_color="#C85C8E", font=("Roboto",21),show="*")
         self.password_entry.place(anchor='center', relx=0.5, rely=0.4)
+        self.password_entry.get()
 
-        login_button = ctk.CTkButton(self,text="Login", fg_color="#7B2869", width=250, height=60, hover_color="#9D3C72",command=lambda: self.connect_server(master,self.user_entry,self.password_entry,"Login")).place(anchor='w', relx=0.51, rely=0.5)
-        register_button = ctk.CTkButton(self,text="Register", fg_color="#7B2869", width=250, height=60, hover_color="#9D3C72",command=lambda: self.connect_server(master,self.user_entry,self.password_entry,"Register")).place(anchor='e', relx=0.49, rely=0.5)    
+
+        self.login_button = ctk.CTkButton(self,text="Login", fg_color="#7B2869", width=250, height=60, hover_color="#9D3C72",command=lambda: self.connect_server(master,self.user_entry,self.password_entry,"Login"))
+        self.login_button.place(anchor='w', relx=0.51, rely=0.5)
+        self.register_button = ctk.CTkButton(self,text="Register", fg_color="#7B2869", width=250, height=60, hover_color="#9D3C72",command=lambda: self.connect_server(master,self.user_entry,self.password_entry,"Register"))    
+        self.register_button.place(anchor='e', relx=0.49, rely=0.5)
 
         #ctk.CTkLabel(self, text="This is page one").pack(side="top", fill="x", pady=10)
         #ctk.CTkButton(self, text="Return to start page",
         #          command=lambda: master.switch_frame(ConnectPage)).pack()
     
 
-    def connect_server(self,root,user_entry,password_entry,state):
-        if not self.CONNECTING:
-            
-            user_entry.configure(state=ctk.DISABLED)
-            password_entry.configure(state=ctk.DISABLED)
-            
-            user = user_entry.get()
-            password = hashlib.sha1(password_entry.get().encode()).hexdigest()
-            
+    def connect_server(self,root,user_entry,password_entry,state):  
+        user_entry.configure(state=ctk.DISABLED)
+        password_entry.configure(state=ctk.DISABLED)
+        
+        password = password_entry.get()
+        user = user_entry.get()
+        if not password == "" and not user == "":
+            password = hashlib.sha1(password.encode()).hexdigest()
+                
             if all(ch not in "#" for ch in user):
+                self.disable_buttons()
                 connection_thread = threading.Thread(target=self.try_connection, args=(user, password,state))
                 connection_thread.start()
                 root.after(2000, self.conclude_connection, root, connection_thread)
             else:
                 print('error')
-
-        else:
-            print("wait for connection thread to finish")
         
         user_entry.configure(state=ctk.NORMAL)
         password_entry.configure(state=ctk.NORMAL)
@@ -166,7 +166,6 @@ class LoginPage(ctk.CTkFrame):
         global Encryptor
         global SOCK
 
-        self.CONNECTING = True
         if state == "Register":
             cod = "REG"
         else:
@@ -176,8 +175,6 @@ class LoginPage(ctk.CTkFrame):
         code,msg = Encryptor.recieve_msg(SOCK)
         if code == "SUC":
             self.LOGGED = True
-
-        self.CONNECTING = False
     
     def conclude_connection(self,root, thread : threading.Thread):
         thread.join(timeout=0.2)
@@ -185,17 +182,24 @@ class LoginPage(ctk.CTkFrame):
         if thread.is_alive():
             root.after(1500,self.conclude_connection,root,thread)
         else:
+            self.enable_buttons()
             print("thread ended")
             if self.LOGGED:
                 print("Logged to server")
                 root.switch_frame(SearchPage)
 
+    def disable_buttons(self):
+        self.login_button.configure(state="disabled", fg_color="#808080")
+        self.register_button.configure(state="disabled", fg_color="#808080")
+    
+    def enable_buttons(self):
+        self.login_button.configure(state="normal", fg_color="#7B2869")
+        self.register_button.configure(state="normal", fg_color="#7B2869")
+
+
 
 class SearchPage(ctk.CTkFrame):
     def __init__(self, master):
-        self.CONNECTING = False
-        self.LOGGED = False
-        self.Play = False
         self.FINISH = False
 
         ctk.CTkFrame.__init__(self, master)
@@ -243,9 +247,7 @@ class SearchPage(ctk.CTkFrame):
         self.values = []
 
     def get_search(self,root):
-        if not self.SEARCH:
-            self.SEARCH = True
-
+            self.disable_buttons()
             self.songs_menu.set("")
             self.choice = ""
             self.songs_menu.configure(values="")
@@ -260,8 +262,6 @@ class SearchPage(ctk.CTkFrame):
                 search_thread.start()
 
                 self.after(1500,self.try_end_search,search_thread,root)
-   
-                print("Wait for thread to finish" if self.SEARCH else "")
     
     def try_end_search(self,search_thread,root):
         search_thread.join(timeout=0.2)
@@ -269,13 +269,13 @@ class SearchPage(ctk.CTkFrame):
         if search_thread.is_alive():
             self.after(500,self.try_end_search,search_thread,root)
         else:
-            self.SEARCH = False
+            self.enable_buttons()
             print("thread ended")
             if self.FINISH:
                 if IS_SYNC:
                     root.switch_frame(KarayokePage)
                 else:
-                    root.switch_fram(KarayokePageNO)
+                    root.switch_frame(KarayokePageNO)
 
     def get_lst_songs(self):
         code, msg = Encryptor.recieve_msg(SOCK)
@@ -292,6 +292,7 @@ class SearchPage(ctk.CTkFrame):
                 self.values = search_results
         except:
             print("Error")
+        
 
     
     def optionmenu_callback(self,choice):
@@ -300,15 +301,12 @@ class SearchPage(ctk.CTkFrame):
     
 
     def get_song_details(self,root):
-        if not self.Play:
-            self.Play = True
+        self.disable_buttons()
+        search_thread = threading.Thread(target=self.get_song)
+        search_thread.start()
 
-            search_thread = threading.Thread(target=self.get_song)
-            search_thread.start()
-
-            self.after(1500,self.try_end_search,search_thread,root)
+        self.after(1500,self.try_end_search,search_thread,root)
    
-            print("Wait for thread to finish" if self.Play else "")
 
     def get_song(self):
         global SONG,LYRICS,TIMES,IS_SYNC
@@ -352,8 +350,17 @@ class SearchPage(ctk.CTkFrame):
             self.FINISH = True
         except Exception as err:
             print(err)
+        
+        self.enable_buttons()
 
-        self.Play = False
+    
+    def disable_buttons(self):
+        self.search_button.configure(state="disabled", fg_color="#808080")
+        self.play_button.configure(state="disabled", fg_color="#808080")
+
+    def enable_buttons(self):
+        self.search_button.configure(state="normal", fg_color="#9D3C72")
+        self.play_button.configure(state="normal", fg_color="#7B2869")
 
 
 class KarayokePage(ctk.CTkFrame):
