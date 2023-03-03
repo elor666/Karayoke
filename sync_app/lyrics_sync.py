@@ -2,7 +2,7 @@ import customtkinter as tk
 import pygame
 from youtube_lyrics import search_result,download_song_lyrics
 import os
-
+import threading
 
 
 
@@ -224,11 +224,13 @@ class SearchPage(tk.CTkFrame):
         self.songs_menu.place(anchor="center", relx=0.2, rely=0.5)
 
         self.SEARCH = False
-        self.search_button = tk.CTkButton(self,text="Search", fg_color="#9D3C72", width=56, height=56, hover_color="#C85C8E", command=lambda :self.get_search(),corner_radius=200,text_color="#FFBABA")
+        self.search_button = tk.CTkButton(self,text="Search", fg_color="#9D3C72", width=56, height=56, hover_color="#C85C8E", command=lambda :self.search(None),corner_radius=200,text_color="#FFBABA")
         self.search_button.place(anchor='e', relx=0.19, rely=0.6)
 
         self.CAN_SYNC = False
-        self.sync_button = tk.CTkButton(self,text="Sync", fg_color="#9D3C72", width=56, height=56, hover_color="#C85C8E", command=lambda :self.get_sync(master),corner_radius=200,text_color="#FFBABA")
+        self.DOWNLOAD = False
+        self.DONE = False
+        self.sync_button = tk.CTkButton(self,text="Sync", fg_color="#808080", width=56, height=56, hover_color="#C85C8E", command=lambda :self.sync(master,None),corner_radius=200, state="disabled", text_color="#FFBABA")
         self.sync_button.place(anchor='w', relx=0.21, rely=0.6)
 
         self.labels = [tk.CTkLabel(self,text="", font=("Roboto",24), text_color="#FFBABA") for i in range(5)]
@@ -249,40 +251,93 @@ class SearchPage(tk.CTkFrame):
             for i in range(len(result),len(self.labels)):
                 self.labels[i].configure(text="")
 
+    def search(self,thread : threading.Thread):
+        if thread == None:
+            self.search_button.configure(state="disabled",fg_color="#808080")
+            self.artist_entry.configure(state="disabled")
+            self.song_entry.configure(state="disabled")
+            search_thread = threading.Thread(target=self.get_search)
+            search_thread.start()
+            self.after(500,self.search,search_thread)
+        else:
+            if thread.is_alive():
+                self.after(500,self.search,thread)
+            else:
+                self.search_button.configure(state="normal",fg_color="#9D3C72")
+                self.artist_entry.configure(state="normal")
+                self.song_entry.configure(state="normal")
+                print("got search")
     
+
     def get_search(self):
         self.SEARCH = True
-        artist = self.artist_entry.get().lower()
-        song = self.song_entry.get().lower()
+        artist = self.artist_entry.get().lower().strip()
+        song = self.song_entry.get().lower().strip()
         result = search_result(artist,song)
         if result != []:
             if not f"{artist} {song}" in result:
-                #print(result)
                 self.values = result
                 self.songs_menu.configure(values=self.values)
                 self.insert_results(result)
+                self.DOWNLOAD = True
             else:
                 [self.labels[i].configure(text="Can Sync") if i == 0 else self.labels[i].configure(text="") for i in range(len(self.labels))]
-                self.CAN_SYNC = True
-    
-    def get_sync(self,root):
-        if self.SEARCH:
-            print("check if needs download")
-            if self.CAN_SYNC or self.choice != "":
-                print("choice",self.choice)
-                artist = self.artist_entry.get().lower()
-                song = self.song_entry.get().lower()
-                if self.choice != "":
-                    index = self.values.index(self.choice)
-                    download_song_lyrics(artist,song,int(index))
-                    self.CAN_SYNC = True
-                if self.CAN_SYNC:
-                    global SONG_PATH
-                    create_song_dir(artist,song)
-                    SONG_PATH = "Songs\\"+artist.lower()+" "+song.lower()+".ogg"
+                self.DOWNLOAD = False
+            self.CAN_SYNC = True
+            self.sync_button.configure(state="normal",fg_color="#9D3C72")
+        else:
+            self.choice = ""
+            self.values = []
+            self.songs_menu.configure(values=self.values)
+            self.insert_results(result)
+            self.DOWNLOAD = False
+            self.CAN_SYNC = False
+            self.sync_button.configure(state="disabled",fg_color="#808080")
 
+
+    def sync(self,root,thread : threading.Thread):
+        if thread == None:
+            self.sync_button.configure(state="disabled",fg_color="#808080")
+            self.artist_entry.configure(state="disabled")
+            self.song_entry.configure(state="disabled")
+            self.search_button.configure(state="disabled",fg_color="#808080")
+            sync_thread = threading.Thread(target=self.get_sync)
+            sync_thread.start()
+            self.after(500,self.sync,root,sync_thread)
+        else:
+            if thread.is_alive():
+                self.after(500,self.sync,root,thread)
+            else:
+                self.sync_button.configure(state="normal",fg_color="#9D3C72")
+                self.artist_entry.configure(state="normal")
+                self.song_entry.configure(state="normal")
+                self.search_button.configure(state="normal",fg_color="#9D3C72")
+                if self.DONE:
                     root.switch_frame(SyncPage)
 
+    
+    def get_sync(self):
+        if self.CAN_SYNC:
+            print("check if needs download")
+            artist = self.artist_entry.get().lower()
+            song = self.song_entry.get().lower()
+            if self.choice != "":
+                print("choice",self.choice)
+                if self.DOWNLOAD:
+                    index = self.values.index(self.choice)
+                    if download_song_lyrics(artist,song,int(index)):
+                        self.CAN_SYNC = True
+                    else:
+                        self.CAN_SYNC = False
+            if self.CAN_SYNC:
+                global SONG_PATH
+                create_song_dir(artist,song)
+                SONG_PATH = "Songs\\"+artist.lower()+" "+song.lower()+".ogg"
+                self.DONE = True
+            elif not self.CAN_SYNC:
+                self.DONE = False
+            else:
+                print("Not choose")
 
 """artist = "stellar"
 song = "cold outside"
