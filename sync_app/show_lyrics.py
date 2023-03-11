@@ -4,8 +4,7 @@ from math import floor,ceil
 
 LINE_COUNT = 7
 
-
-class TextLabelApp(tk.CTk):
+class TimedLyrics(tk.CTk):
     def __init__(self, file_path, *args, **kwargs):
         tk.CTk.__init__(self, *args, **kwargs)
         self.state("zoomed")
@@ -23,20 +22,20 @@ class TextLabelApp(tk.CTk):
             self.times = f.readlines()
         self.times = [float(time[:-1]) if time[-1]=='\n' else float(time) for time in self.times]
 
-        self.labels = [tk.CTkLabel(self, text=line,font=('Roboto',40)) for line in self.text_lines[:LINE_COUNT]]
+        self.labels = [tk.CTkLabel(self,text_color="white" ,text=line,font=('Roboto',40)) for line in self.text_lines[:LINE_COUNT]]
         for i,label in enumerate(self.labels):
             label.place(anchor="w",relx=0.1,rely=0.15+0.075*i)
         
 
-        self.play_button = tk.CTkButton(self, text="Play", command=self.play_music)
-        self.pause_button = tk.CTkButton(self, text="Pause", command=self.pause_music)
+        self.play_button = tk.CTkButton(self, text="Play", command=self.play_music,fg_color="#7B2869",hover_color="#9D3C72")
+        self.pause_button = tk.CTkButton(self, text="Pause", command=self.pause_music,fg_color="#7B2869",hover_color="#9D3C72")
 
         self.play_button.place(anchor='se',relx=0.53,rely=0.90,relwidth=0.025)
         self.pause_button.place(anchor='sw',relx=0.47,rely=0.90,relwidth=0.025)
 
-        audio_length = pygame.mixer.Sound("Songs\\"+file_path+".ogg").get_length()
+        self.audio_length = pygame.mixer.Sound("Songs\\"+file_path+".ogg").get_length()
 
-        self.time_slider = tk.CTkSlider(self, from_=0, to=audio_length, orientation="horizontal",command=self.update_start)#, number_of_steps=round(audio_length//0.1)
+        self.time_slider = tk.CTkSlider(self, from_=0, to=self.audio_length, orientation="horizontal",command=self.update_start,button_color="#7B2869",button_hover_color="#9D3C72")#, number_of_steps=round(audio_length//0.1)
         self.time_slider.set(pygame.mixer.music.get_pos())
         self.time_slider.place(anchor="n",relx=0.5,rely=0.90,relwidth=0.7)
         #print(self.time_slider.get(),audio_length)
@@ -44,8 +43,7 @@ class TextLabelApp(tk.CTk):
 
         self.boldid = None
         #self.after_cancel(self.afterid)
-
-        self.update_slider()
+        self.update_id = None
     
     def get_time_index(self,cur_time):
         if cur_time <= self.times[0]:
@@ -89,20 +87,26 @@ class TextLabelApp(tk.CTk):
                 self.boldid = self.after(int(self.get_time_range(index,cur_time)*1000),self.update_labels)#int(self.get_time_range(self.get_time_index(cur_time),cur_time)*1000)
             else:
                 self.boldid = self.after(0,self.update_labels)
-            pygame.mixer.music.play(start=self.time_slider.get())
+            time = self.time_slider.get()
+            if time<self.audio_length:
+                pygame.mixer.music.play(start=time)
+                self.update_id = self.after(0,self.update_slider,True)
 
     def pause_music(self):
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.pause()
+            self.after_cancel(self.update_id)
+            self.update_slider(False)
             self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
             self.start = self.start+pygame.mixer.music.get_pos()/1000
             pygame.mixer.music.stop()
             self.after_cancel(self.boldid)
 
-    def update_slider(self):
+    def update_slider(self,again:bool):
         if pygame.mixer.music.get_busy():
             self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
-        self.after(10,self.update_slider)
+        if again:
+            self.update_id = self.after(10,self.update_slider,True)
     
     def update_start(self,value):
         if not pygame.mixer.music.get_busy():
@@ -124,12 +128,71 @@ class TextLabelApp(tk.CTk):
         """gets index of line in text_lines"""
         if index<len(self.text_lines):
             index = self.calculate_index(index)
-            [label.configure(text_color="pink",font=('Roboto',40)) if i<index else label.configure(text_color="white",font=('Roboto',40)) for i,label in enumerate(self.labels)]
-            self.labels[index].configure(text_color="red",font=('Roboto',53))
+            [label.configure(text_color="#FFBABA",font=('Roboto',40)) if i<index else label.configure(text_color="white",font=('Roboto',40)) for i,label in enumerate(self.labels)]
+            self.labels[index].configure(text_color="#C85C8E",font=('Roboto',53))
 
+
+class Lyrics(tk.CTk):
+    def __init__(self, file_path, *args, **kwargs):
+        tk.CTk.__init__(self, *args, **kwargs)
+        self.state("zoomed")
+        self.file_path = file_path
+        pygame.mixer.init()
+        pygame.mixer.music.load("Songs\\"+file_path+".ogg")
         
-    
+        with open("SongsDetails\\"+self.file_path+"\\lyrics.txt", 'r') as f:
+            self.text_lines = f.readlines()
+        self.text_lines = [line[:-1] if line[-1]=='\n' else line for line in self.text_lines if line != "\n"]
+
+
+        self.label_frame = tk.CTkScrollableFrame(self,width=0.90*self.winfo_width(),height=0.8*self.winfo_height())
+        self.label_frame.place(anchor="nw",relx=0.05,rely=0.01)
+        self.labels = [tk.CTkLabel(self.label_frame,text_color="white" ,text=line,font=('Roboto',40)) for line in self.text_lines]
+        for i,label in enumerate(self.labels):
+            label.pack(anchor='w',pady=20,padx=10)
+        
+
+        self.play_button = tk.CTkButton(self, text="Play", command=self.play_music,fg_color="#7B2869",hover_color="#9D3C72")
+        self.pause_button = tk.CTkButton(self, text="Pause", command=self.pause_music,fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.play_button.place(anchor='se',relx=0.53,rely=0.90,relwidth=0.025)
+        self.pause_button.place(anchor='sw',relx=0.47,rely=0.90,relwidth=0.025)
+
+        self.audio_length = pygame.mixer.Sound("Songs\\"+file_path+".ogg").get_length()
+
+        self.time_slider = tk.CTkSlider(self, from_=0, to=self.audio_length, orientation="horizontal",command=self.update_start,button_color="#7B2869",button_hover_color="#9D3C72")#, number_of_steps=round(audio_length//0.1)
+        self.time_slider.set(pygame.mixer.music.get_pos())
+        self.time_slider.place(anchor="n",relx=0.5,rely=0.90,relwidth=0.7)
+        self.start = 0
+
+        self.update_id = None
+
+
+    def update_start(self,value):
+        if not pygame.mixer.music.get_busy():
+            self.start = value
+
+    def pause_music(self):
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.pause()
+            self.after_cancel(self.update_id)
+            self.update_slider(False)
+            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+            self.start = self.start+pygame.mixer.music.get_pos()/1000
+            pygame.mixer.music.stop()  
+
+    def play_music(self):
+        if not pygame.mixer.music.get_busy():
+            cur_time = self.time_slider.get()
+            pygame.mixer.music.play(start=cur_time)
+            self.update_id = self.after(0,self.update_slider,True)
+
+    def update_slider(self,again: bool):
+        if pygame.mixer.music.get_busy():
+            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+        if again:
+            self.update_id = self.after(10,self.update_slider,True)
 
 if __name__ == "__main__":
-    app = TextLabelApp(r"elley duh money on the dash")
+    app = TimedLyrics(r"i am king impossible")
     app.mainloop()
