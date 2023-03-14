@@ -7,6 +7,7 @@ import pickle
 import base64
 from io import BytesIO
 from pathlib import Path
+from split import separate_song
 
 FINISH = False
 DATA_BASE = None
@@ -85,9 +86,10 @@ def get_lyr(path):
 def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
   artist = ""
   song = ""
-  MY_SONG = False
+  MY_SONG = False #if the song is in server folder
   while True:
     code,msg = encryptor.recieve_msg(sock)
+
     if code == "SCH":
       msg = msg.decode()
       artist,song = msg.split("#")
@@ -98,12 +100,18 @@ def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
         MY_SONG = False
       print(result,MY_SONG)
       encryptor.send_msg(sock,base64.b64encode(pickle.dumps(result)).decode(),"SCH")
-    if code == "RES":
+
+    elif code == "RES" or code == "REV":
       msg = int(msg)
       if not MY_SONG:
         out_file = download_song_lyrics(artist,song,msg)
       else:
         out_file = f"Songs\\{artist} {song}.ogg"
+      
+      if code == "REV" and out_file:
+        separate_song(out_file,artist,song)
+        out_file = f"SongsDetails\\{artist} {song}\\accompaniment.ogg"
+
       if out_file:
         pickled_file = get_fileobject(out_file)
 
@@ -119,7 +127,8 @@ def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
         
         lyrics = get_lyr(f"SongsDetails\\{artist} {song}\\lyrics.txt")
         encryptor.send_msg(sock,lyrics,"LYC")
-    if code=="EXT":
+
+    elif code=="EXT":
       return True
 
 
