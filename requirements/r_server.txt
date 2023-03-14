@@ -2,7 +2,7 @@ pathlib
 pyCryptodome
 youtube-search-python
 pytube
-pydub
+pydub==0.23
 requests
 pathlib
 beautifulsoup4
