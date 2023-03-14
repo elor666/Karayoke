@@ -86,7 +86,8 @@ def download_song_lyrics(artist_name, song_name, search_index):
             path_file = r"Songs/"+f"{artist_name} {song_name}"+".ogg"
             AudioSegment.from_file(data).export(path_file,format="ogg")
         
-        return path_file
+            return path_file
+        return f"Songs\\{artist_name} {song_name}.ogg"
     
     return False
 
@@ -108,6 +109,6 @@ def search_result(artist_name, song_name):
 	
 
 #get_song_text("stellar", "cold outside")
-
+download_song_lyrics("stellar","cold outside",0)
 #print(new_file)
 #print(strem)
