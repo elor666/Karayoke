@@ -310,7 +310,10 @@ class SearchPage(ctk.CTkFrame):
 
     def get_song(self):
         global SONG,LYRICS,TIMES,IS_SYNC
-        Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"RES")
+        if not self.no_vocals:
+            Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"RES")
+        else:
+            Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"REV")
         try:
             code, msg = Encryptor.recieve_msg(SOCK)
             if code == "RES":
