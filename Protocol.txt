@@ -16,6 +16,11 @@ Server msgs:
 {SCH}{pickled_list_search} - server sends pickled list of the names of the search result.
 {SCH}{} - server sends nothing - meaning that the search failed.
 
+{SYC}{1} there is lyrics sync for the chosen song.
+{SYC}{0} there is no lyrics sync for the chosen song.
+
+{TIM}{pickled_times} server send pickled times of lyrics.
+
 Client msgs:
 ------------
 
@@ -26,3 +31,5 @@ Client msgs:
 {REG}{username#hashed_password} - client sends register request with username and hashed password.
 
 {SCH}{artist_name#song} - client sends search request with the name of the artist and the song.
+
+{RES} - client sends the index of chosen song in the search list.
