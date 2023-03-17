@@ -196,5 +196,5 @@ class Lyrics(tk.CTk):
             self.update_id = self.after(10,self.update_slider,True)
 
 if __name__ == "__main__":
-    app = TimedLyrics(r"ed sheeran shape of you")
+    app = TimedLyrics(r"elley duh money on the dash")
     app.mainloop()

@@ -6,14 +6,68 @@ import requests
 from pathlib import Path
 from io import BytesIO
 import os
-import webbrowser
-import pyperclip
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+import time
 import subprocess
 import tempfile
 
 Num_Search = 5
 Max_duration = 420 #7 minutes long
 
+
+def download_wait(directory, timeout):
+    """
+    Wait for downloads to finish with a specified timeout.
+    """
+    seconds = 0
+    dl_wait = True
+    while dl_wait and seconds < timeout:
+        time.sleep(1)
+        dl_wait = False
+        files = os.listdir(directory)
+
+        for fname in files:
+            if fname.endswith('.crdownload'):
+                dl_wait = True
+
+        seconds += 1
+    time.sleep(3)
+
+def download_youtube(url:str,directory:str):
+  """youtube download"""
+  url = "https://www.ss"+url[12:]
+
+  option = Options()
+  option.add_argument("--disable-extensions")
+  #option.add_argument("--start-maximized")
+  option.add_experimental_option(
+      "prefs", {"profile.default_content_setting_values.notifications": 2,"profile.default_content_settings.popups": 0,"download.default_directory" : directory}
+  )
+
+  driver = webdriver.Chrome(ChromeDriverManager().install(),chrome_options=option)
+  driver.get(url)
+  driver.minimize_window()
+  time.sleep(7)
+
+  driver.find_element(By.CSS_SELECTOR,'[class="link link-download subname ga_track_events download-icon"]').click()
+
+  time.sleep(2)
+
+  try:
+    w1 = driver.window_handles[0]
+    w2 = driver.window_handles[1]
+    driver.switch_to.window(window_name=w2)
+    driver.close()
+    driver.switch_to.window(w1)
+    driver.minimize_window()
+  except:
+      pass
+  download_wait(directory,240)
+
+  print("finished")
 
 def extract_lyrics(artist_name, song_name):
     """downloads lyrics if have them on the site 'azlyrics.com' and if not downloaded yet."""
@@ -90,30 +144,16 @@ def download_song_lyrics(artist_name, song_name, search_index):
             
                 return path_file
             except Exception as err:
-                print("Youtube changed their api. No support for downloading automaticly.")
-                webbrowser.open('https://en.savefrom.net/1-youtube-video-downloader-457/')
+                if str(err)=="'NoneType' object has no attribute 'span'":
+                    print("Youtube changed their api. No support for pytube.")
 
-                pyperclip.copy(url)
-                print(url,"has been copied to your clipboard")
-                
-                
-                temp = tempfile.TemporaryDirectory()
-                subprocess.Popen(f'explorer "{temp.name}"')
-
-                finish = False
-                while not finish:
-                    input("press Enter to continue")
-                    try:
-                        fpath = f"{temp.name}\\"+[f for f in os.listdir(temp.name) if os.path.isfile(os.path.join(temp.name, f))][0]
-                        AudioSegment.from_file(fpath).export(r"Songs/"+f"{artist_name} {song_name}"+".ogg",format="ogg")
-                        os.remove(fpath)
-                        finish = True
-                    except Exception as err:
-                        print(err)
-                        print("follow the insturctions above and try again")
-                
-                temp.cleanup()
-                return f"Songs\\{artist_name} {song_name}.ogg"
+                    temp = tempfile.TemporaryDirectory()
+                    download_youtube(url,temp.name)
+                    fpath = f"{temp.name}\\{os.listdir(temp.name)[0]}"
+                    AudioSegment.from_file(fpath).export(r"Songs/"+f"{artist_name} {song_name}"+".ogg",format="ogg")
+                    os.remove(fpath)
+                    temp.cleanup()
+                    return f"Songs\\{artist_name} {song_name}.ogg"
 
         return f"Songs\\{artist_name} {song_name}.ogg"
     
@@ -137,6 +177,6 @@ def search_result(artist_name, song_name):
 	
 
 #get_song_text("stellar", "cold outside")
-download_song_lyrics("stellar","bad dream",0)
+#print(download_song_lyrics("elley duh","money on the dash",0))
 #print(new_file)
 #print(strem)
