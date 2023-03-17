@@ -6,7 +6,10 @@ import requests
 from pathlib import Path
 from io import BytesIO
 import os
-
+import webbrowser
+import pyperclip
+import subprocess
+import tempfile
 
 Num_Search = 5
 Max_duration = 420 #7 minutes long
@@ -66,27 +69,52 @@ def download_song_lyrics(artist_name, song_name, search_index):
 
     if extract_lyrics(artist_name, song_name):
         if not Path(f"Songs\\{artist_name} {song_name}.ogg").is_file():
-            videosSearch = VideosSearch(f"{artist_name} {song_name}", limit = search_index+1)
+            try:
+                videosSearch = VideosSearch(f"{artist_name} {song_name}", limit = search_index+1)
 
-            r = videosSearch.result()
-            #print(r)
-            #print(type(r["result"]))
-            #for i in r["result"]:
-                #print(i)
-                #print("link",i["link"])
-            url = r["result"][search_index]["link"]
-            print(r["result"][search_index]["title"])
+                r = videosSearch.result()
+                #print(r)
+                #print(type(r["result"]))
+                #for i in r["result"]:
+                    #print(i)
+                    #print("link",i["link"])
+                url = r["result"][search_index]["link"]
 
-            print(url)
-            data = BytesIO()
-            yt = YouTube(url)
-            strem = yt.streams.filter(only_audio=True).asc()[0]
-            strem.stream_to_buffer(data)
-            data.seek(0)
-            path_file = r"Songs/"+f"{artist_name} {song_name}"+".ogg"
-            AudioSegment.from_file(data).export(path_file,format="ogg")
-        
-            return path_file
+                data = BytesIO()
+                yt = YouTube(url)
+                strem = yt.streams.filter(only_audio=True).asc()[0]
+                strem.stream_to_buffer(data)
+                data.seek(0)
+                path_file = r"Songs/"+f"{artist_name} {song_name}"+".ogg"
+                AudioSegment.from_file(data).export(path_file,format="ogg")
+            
+                return path_file
+            except Exception as err:
+                print("Youtube changed their api. No support for downloading automaticly.")
+                webbrowser.open('https://en.savefrom.net/1-youtube-video-downloader-457/')
+
+                pyperclip.copy(url)
+                print(url,"has been copied to your clipboard")
+                
+                
+                temp = tempfile.TemporaryDirectory()
+                subprocess.Popen(f'explorer "{temp.name}"')
+
+                finish = False
+                while not finish:
+                    input("press Enter to continue")
+                    try:
+                        fpath = f"{temp.name}\\"+[f for f in os.listdir(temp.name) if os.path.isfile(os.path.join(temp.name, f))][0]
+                        AudioSegment.from_file(fpath).export(r"Songs/"+f"{artist_name} {song_name}"+".ogg",format="ogg")
+                        os.remove(fpath)
+                        finish = True
+                    except Exception as err:
+                        print(err)
+                        print("follow the insturctions above and try again")
+                
+                temp.cleanup()
+                return f"Songs\\{artist_name} {song_name}.ogg"
+
         return f"Songs\\{artist_name} {song_name}.ogg"
     
     return False
@@ -109,6 +137,6 @@ def search_result(artist_name, song_name):
 	
 
 #get_song_text("stellar", "cold outside")
-download_song_lyrics("stellar","cold outside",0)
+download_song_lyrics("stellar","bad dream",0)
 #print(new_file)
 #print(strem)

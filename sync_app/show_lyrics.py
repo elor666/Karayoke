@@ -3,6 +3,8 @@ import pygame
 from math import floor,ceil
 
 LINE_COUNT = 7
+tk.set_appearance_mode("dark")
+
 
 class TimedLyrics(tk.CTk):
     def __init__(self, file_path, *args, **kwargs):
@@ -194,5 +196,5 @@ class Lyrics(tk.CTk):
             self.update_id = self.after(10,self.update_slider,True)
 
 if __name__ == "__main__":
-    app = TimedLyrics(r"i am king impossible")
+    app = TimedLyrics(r"ed sheeran shape of you")
     app.mainloop()
