@@ -139,14 +139,14 @@ class TimedLyrics(tk.CTk):
             self.time_slider.set(self.start+ml_time/1000)
 
             ml_time += self.start*1000
-            self.time_label.configure(text=pd.to_datetime(ml_time, unit='ms').strftime("%H:%M:%S"))
+            self.time_label.configure(text=pd.to_datetime(ml_time, unit='ms').strftime("%M:%S.%f")[:7])
         if again:
-            self.update_id = self.after(50,self.update_slider,True)
+            self.update_id = self.after(100,self.update_slider,True)
     
     def update_start(self,value):
         if not pygame.mixer.music.get_busy():
             self.start = value
-            self.time_label.configure(text=pd.to_datetime(self.start*1000, unit='ms').strftime("%H:%M:%S"))
+            self.time_label.configure(text=pd.to_datetime(self.start*1000, unit='ms').strftime("%M:%S.%f")[:7])
             if not self.time_slider.get()<self.times[0]:
                 self.update_labels()
             else:
