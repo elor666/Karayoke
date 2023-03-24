@@ -2,6 +2,8 @@ import customtkinter as tk
 import pygame
 from math import floor,ceil
 
+import pandas as pd
+
 LINE_COUNT = 7
 tk.set_appearance_mode("dark")
 
@@ -19,6 +21,8 @@ class TimedLyrics(tk.CTk):
             self.text_lines = f.readlines()
         self.text_lines = [line[:-1] if line[-1]=='\n' else line for line in self.text_lines if line != "\n"]
         #print(self.text_lines)
+
+        self.scroll_index = 0
 
         with open("SongsDetails\\"+self.file_path+"\\times.txt", 'r') as f:
             self.times = f.readlines()
@@ -46,8 +50,25 @@ class TimedLyrics(tk.CTk):
         self.boldid = None
         #self.after_cancel(self.afterid)
         self.update_id = None
+
+        self.bind("<MouseWheel>", self.mouse_scroll)
+
+        self.time_label = tk.CTkLabel(self,text_color="white" ,text="0",font=('Roboto',25))
+        self.time_label.place(anchor="n",relx=0.5,rely=0.915)
     
+    def mouse_scroll(self, event):
+        if not pygame.mixer.music.get_busy():
+            if event.delta > 0:
+                #print("up")
+                self.scroll_index = max(0,self.scroll_index - 1)
+            else:
+                self.scroll_index =min(len(self.times) - LINE_COUNT,self.scroll_index + 1)
+
+            self.update_labels(index=self.scroll_index)
+
+
     def get_time_index(self,cur_time):
+        """Return the index of the time un the times list"""
         if cur_time <= self.times[0]:
             return 0
         elif cur_time >= self.times[-1]:
@@ -64,22 +85,30 @@ class TimedLyrics(tk.CTk):
         else:
             return self.times[index]-cur_time
 
-    def update_labels(self):
-        cur_time = self.time_slider.get()
-        value = self.get_time_index(cur_time)
+    def update_labels(self,index = None):
+        if index==None:
+            cur_time = self.time_slider.get()
+            value = self.get_time_index(cur_time)
+            self.scroll_index=value
+        else:
+            value = self.scroll_index
+
         if value>floor(LINE_COUNT/2) and value<=len(self.text_lines)-ceil(LINE_COUNT/2):
             for i in range(LINE_COUNT):
-                self.labels[i].configure(text=self.text_lines[value-floor(LINE_COUNT/2) + i])
-        if value<=floor(LINE_COUNT/2):
+                self.labels[i].configure(text=self.text_lines[value-floor(LINE_COUNT/2) + i],text_color="white",font=('Roboto',40))
+        elif value<=floor(LINE_COUNT/2):
             for i in range(LINE_COUNT):
-                self.labels[i].configure(text=self.text_lines[i])
+                self.labels[i].configure(text=self.text_lines[i],text_color="white",font=('Roboto',40))
         elif value>len(self.text_lines)-ceil(LINE_COUNT/2):
             for i in range(LINE_COUNT):
-                self.labels[i].configure(text=self.text_lines[len(self.text_lines)-LINE_COUNT+i])
-        self.bold_line(value)
-        if value < len(self.text_lines)-1:
-            if pygame.mixer.music.get_busy():
-                self.boldid = self.after((int((self.get_time_range(value+1,cur_time)))*1000),self.update_labels)
+                self.labels[i].configure(text=self.text_lines[len(self.text_lines)-LINE_COUNT+i],text_color="white",font=('Roboto',40))
+
+
+        if index==None:
+            self.bold_line(value)
+            if value < len(self.text_lines)-1:
+                if pygame.mixer.music.get_busy():
+                    self.boldid = self.after((int((self.get_time_range(value+1,cur_time)))*1000),self.update_labels)
     
     def play_music(self):
         if not pygame.mixer.music.get_busy():
@@ -106,13 +135,18 @@ class TimedLyrics(tk.CTk):
 
     def update_slider(self,again:bool):
         if pygame.mixer.music.get_busy():
-            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+            ml_time = pygame.mixer.music.get_pos()
+            self.time_slider.set(self.start+ml_time/1000)
+
+            ml_time += self.start*1000
+            self.time_label.configure(text=pd.to_datetime(ml_time, unit='ms').strftime("%H:%M:%S"))
         if again:
-            self.update_id = self.after(10,self.update_slider,True)
+            self.update_id = self.after(50,self.update_slider,True)
     
     def update_start(self,value):
         if not pygame.mixer.music.get_busy():
             self.start = value
+            self.time_label.configure(text=pd.to_datetime(self.start*1000, unit='ms').strftime("%H:%M:%S"))
             if not self.time_slider.get()<self.times[0]:
                 self.update_labels()
             else:
@@ -127,11 +161,11 @@ class TimedLyrics(tk.CTk):
             return LINE_COUNT-(len(self.text_lines)-index)
 
     def bold_line(self,index):
-        """gets index of line in text_lines"""
+        """bold index of line in text_lines"""
         if index<len(self.text_lines):
             index = self.calculate_index(index)
             [label.configure(text_color="#FFBABA",font=('Roboto',40)) if i<index else label.configure(text_color="white",font=('Roboto',40)) for i,label in enumerate(self.labels)]
-            self.labels[index].configure(text_color="#C85C8E",font=('Roboto',53))
+            self.labels[index].configure(text_color="#C85C8E",font=('Roboto',55))
 
 
 class Lyrics(tk.CTk):

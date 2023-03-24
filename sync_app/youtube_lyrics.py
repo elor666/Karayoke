@@ -144,6 +144,7 @@ def download_song_lyrics(artist_name, song_name, search_index):
             
                 return path_file
             except Exception as err:
+                print(err)
                 if str(err)=="'NoneType' object has no attribute 'span'":
                     print("Youtube changed their api. No support for pytube.")
 
