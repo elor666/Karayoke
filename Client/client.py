@@ -19,6 +19,27 @@ TIMES = None
 IS_SYNC = False
 LINE_COUNT = 7
 
+
+def time_format(ml_seconds):
+    ml_seconds = int(ml_seconds)
+    seconds, milliseconds = divmod(ml_seconds, 1000)
+    minutes, seconds = divmod(seconds, 60)
+
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def equlize_words(sentence : str,limit=110):
+    words = sentence.split()
+    new_sentence = ""
+    for word in words:
+        if len(new_sentence.split("\n")[-1])+len(word)+1 > limit:
+            new_sentence+='\n'+word
+        else:
+            new_sentence += " "+word
+
+    return new_sentence[1:]
+
+
 class App(ctk.CTk):
     def __init__(self):
         ctk.set_appearance_mode("dark")
@@ -233,18 +254,34 @@ class SearchPage(ctk.CTkFrame):
         
         self.songs_menu.place(anchor="w", relx=0.455, rely=0.4)
 
-        self.no_vocals = ctk.BooleanVar()
+        self.no_vocals = ctk.BooleanVar(value=False)
+
+        self.auto_sync = ctk.BooleanVar(value=False)
 
         self.vocals_check = ctk.CTkCheckBox(self,text="No Vocals", variable=self.no_vocals, onvalue=True, offvalue=False,
         checkmark_color="#FFBABA", fg_color="#7B2869",font=("Roboto",21),text_color="#C85C8E")
 
         self.vocals_check.place(anchor="center", relx=0.5, rely=0.5)
 
+        self.auto_check = ctk.CTkCheckBox(self,text="Auto Sync", variable=self.auto_sync, onvalue=True, offvalue=False,
+        checkmark_color="#FFBABA", fg_color="#7B2869",font=("Roboto",21),text_color="#C85C8E")
+
+        self.auto_check.place(anchor="center", relx=0.5, rely=0.55)
+
         self.play_button = ctk.CTkButton(self,text="Play Song", fg_color="#7B2869", command=lambda :self.get_song_details(master),width=280, height=56,hover_color="#9D3C72",text_color="#FFBABA")
         self.play_button.place(anchor="center", relx=0.5, rely=0.6)
 
         self.choice = ""
         self.values = []
+        
+        self.exit_kar = ctk.CTkButton(self, text="Exit", command=self.exit_karyoke,fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.exit_kar.place(anchor="e",relx=0.95,rely=0.02)
+
+    def exit_karyoke(self):
+        global SOCK,Encryptor
+        Encryptor.send_msg(SOCK,"","EXT")
+        self.quit()
 
     def get_search(self,root):
             self.disable_buttons()
@@ -310,10 +347,11 @@ class SearchPage(ctk.CTkFrame):
 
     def get_song(self):
         global SONG,LYRICS,TIMES,IS_SYNC
-        if not self.no_vocals:
-            Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"RES")
+        msg_to_send = str(self.values.index(self.choice))+"#"+str(int(self.auto_sync.get()))
+        if not self.no_vocals.get():
+            Encryptor.send_msg(SOCK,msg_to_send,"RES")
         else:
-            Encryptor.send_msg(SOCK,str(self.values.index(self.choice)),"REV")
+            Encryptor.send_msg(SOCK,msg_to_send,"REV")
         try:
             code, msg = Encryptor.recieve_msg(SOCK)
             if code == "RES":
@@ -368,13 +406,9 @@ class SearchPage(ctk.CTkFrame):
 
 class KarayokePage(ctk.CTkFrame):
     def __init__(self, master):
-        self.CONNECTING = False
-        self.LOGGED = False
-        self.Play = False
         global SONG,LYRICS,TIMES,LINE_COUNT
         ctk.CTkFrame.__init__(self, master)
         self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
-        self.text_lines = []
 
         filee_copy = io.BytesIO(SONG.getvalue())
 
@@ -384,35 +418,65 @@ class KarayokePage(ctk.CTkFrame):
         SONG.seek(0)
 
         self.text_lines = LYRICS
-        #print(self.text_lines)
+        self.text_lines = [equlize_words(line[:-1]) if line[-1]=='\n' else equlize_words(line) for line in self.text_lines if line != "\n"]
 
         self.times = TIMES
 
-        self.labels = [ctk.CTkLabel(self, text=line,font=('Roboto',40)) for line in self.text_lines[:LINE_COUNT]]
+        self.scroll_index = 0
+
+        self.labels = [ctk.CTkLabel(self,text_color="white" ,text=line,font=('Roboto',35)) for line in self.text_lines[:LINE_COUNT]]
         for i,label in enumerate(self.labels):
-            label.place(anchor="w",relx=0.1,rely=0.15+0.075*i)
+            label.place(anchor="w",relx=0.025,rely=0.1+0.11*i)
         
 
-        self.play_button = ctk.CTkButton(self, text="Play", command=self.play_music)
-        self.pause_button = ctk.CTkButton(self, text="Pause", command=self.pause_music)
+        self.play_button = ctk.CTkButton(self, text="Play", command=self.play_music,fg_color="#7B2869",hover_color="#9D3C72")
+        self.pause_button = ctk.CTkButton(self, text="Pause", command=self.pause_music,fg_color="#7B2869",hover_color="#9D3C72")
 
         self.play_button.place(anchor='se',relx=0.53,rely=0.90,relwidth=0.025)
         self.pause_button.place(anchor='sw',relx=0.47,rely=0.90,relwidth=0.025)
 
-        audio_length = pygame.mixer.Sound(filee_copy).get_length()
+        self.audio_length = pygame.mixer.Sound(filee_copy).get_length()
 
-        self.time_slider = ctk.CTkSlider(self, from_=0, to=audio_length, orientation="horizontal",command=self.update_start)#, number_of_steps=round(audio_length//0.1)
+        self.time_slider = ctk.CTkSlider(self, from_=0, to=self.audio_length, orientation="horizontal",command=self.update_start,button_color="#7B2869",button_hover_color="#9D3C72")#, number_of_steps=round(audio_length//0.1)
         self.time_slider.set(pygame.mixer.music.get_pos())
         self.time_slider.place(anchor="n",relx=0.5,rely=0.90,relwidth=0.7)
-        #print(self.time_slider.get(),audio_length)
         self.start = 0
 
         self.boldid = None
-        #self.after_cancel(self.afterid)
+        self.update_id = None
 
-        self.update_slider()
-    
+        self.bind("<MouseWheel>", self.mouse_scroll)
+
+        self.time_label = ctk.CTkLabel(self,text_color="white" ,text="0",font=('Roboto',25))
+        self.time_label.place(anchor="n",relx=0.5,rely=0.915)
+        
+        self.back_button = ctk.CTkButton(self, text="Back", command=lambda: master.switch_frame(SearchPage),fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.back_button.place(anchor="e",relx=0.95,rely=0.02)    
+
+        self.exit_kar = ctk.CTkButton(self, text="Exit", command=self.exit_karyoke,fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.exit_kar.place(anchor="e",relx=0.95,rely=0.03)
+
+    def exit_karyoke(self):
+        global SOCK,Encryptor
+        Encryptor.send_msg(SOCK,"","EXT")
+        self.quit()
+        
+
+    def mouse_scroll(self, event):
+        if not pygame.mixer.music.get_busy():
+            if event.delta > 0:
+                #print("up")
+                self.scroll_index = max(0,self.scroll_index - 1)
+            else:
+                self.scroll_index =min(len(self.times) - LINE_COUNT,self.scroll_index + 1)
+
+            self.update_labels(index=self.scroll_index)
+
+
     def get_time_index(self,cur_time):
+        """Return the index of the time un the times list"""
         if cur_time <= self.times[0]:
             return 0
         elif cur_time >= self.times[-1]:
@@ -429,22 +493,30 @@ class KarayokePage(ctk.CTkFrame):
         else:
             return self.times[index]-cur_time
 
-    def update_labels(self):
-        cur_time = self.time_slider.get()
-        value = self.get_time_index(cur_time)
+    def update_labels(self,index = None):
+        if index==None:
+            cur_time = self.time_slider.get()
+            value = self.get_time_index(cur_time)
+            self.scroll_index=value
+        else:
+            value = self.scroll_index
+
         if value>floor(LINE_COUNT/2) and value<=len(self.text_lines)-ceil(LINE_COUNT/2):
             for i in range(LINE_COUNT):
-                self.labels[i].configure(text=self.text_lines[value-floor(LINE_COUNT/2) + i])
-        if value<=floor(LINE_COUNT/2):
+                self.labels[i].configure(text=self.text_lines[value-floor(LINE_COUNT/2) + i],text_color="white",font=('Roboto',35))
+        elif value<=floor(LINE_COUNT/2):
             for i in range(LINE_COUNT):
-                self.labels[i].configure(text=self.text_lines[i])
+                self.labels[i].configure(text=self.text_lines[i],text_color="white",font=('Roboto',35))
         elif value>len(self.text_lines)-ceil(LINE_COUNT/2):
             for i in range(LINE_COUNT):
-                self.labels[i].configure(text=self.text_lines[len(self.text_lines)-LINE_COUNT+i])
-        self.bold_line(value)
-        if value < len(self.text_lines)-1:
-            if pygame.mixer.music.get_busy():
-                self.boldid = self.after((int((self.get_time_range(value+1,cur_time)))*1000),self.update_labels)
+                self.labels[i].configure(text=self.text_lines[len(self.text_lines)-LINE_COUNT+i],text_color="white",font=('Roboto',35))
+
+
+        if index==None:
+            self.bold_line(value)
+            if value < len(self.text_lines)-1:
+                if pygame.mixer.music.get_busy():
+                    self.boldid = self.after((int((self.get_time_range(value+1,cur_time)))*1000),self.update_labels)
     
     def play_music(self):
         if not pygame.mixer.music.get_busy():
@@ -454,30 +526,44 @@ class KarayokePage(ctk.CTkFrame):
                 self.boldid = self.after(int(self.get_time_range(index,cur_time)*1000),self.update_labels)#int(self.get_time_range(self.get_time_index(cur_time),cur_time)*1000)
             else:
                 self.boldid = self.after(0,self.update_labels)
-                
-            SONG.seek(0)
-            pygame.mixer.music.play(start=self.time_slider.get())
+            time = self.time_slider.get()
+            if time<self.audio_length:
+                pygame.mixer.music.play(start=time)
+                self.update_id = self.after(0,self.update_slider,True)
 
     def pause_music(self):
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.pause()
+            self.after_cancel(self.update_id)
+            self.update_slider(False)
             self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
             self.start = self.start+pygame.mixer.music.get_pos()/1000
             pygame.mixer.music.stop()
             self.after_cancel(self.boldid)
 
-    def update_slider(self):
+    def update_slider(self,again:bool):
         if pygame.mixer.music.get_busy():
-            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
-        self.after(10,self.update_slider)
+            ml_time = pygame.mixer.music.get_pos()
+            self.time_slider.set(self.start+ml_time/1000)
+
+            ml_time += self.start*1000
+
+            formatted_time = time_format(ml_time)
+
+            self.time_label.configure(text=formatted_time)
+        if again:
+            self.update_id = self.after(100,self.update_slider,True)
     
     def update_start(self,value):
         if not pygame.mixer.music.get_busy():
             self.start = value
+            ml_time = self.start*1000
+            formatted_time = time_format(ml_time)
+            self.time_label.configure(text=formatted_time)
             if not self.time_slider.get()<self.times[0]:
                 self.update_labels()
             else:
-                [label.configure(text_color="white",font=('Roboto',40)) for label in self.labels]
+                [label.configure(text_color="white",font=('Roboto',35)) for label in self.labels]
 
     def calculate_index(self,index):
         if index <=floor(LINE_COUNT/2):
@@ -488,22 +574,114 @@ class KarayokePage(ctk.CTkFrame):
             return LINE_COUNT-(len(self.text_lines)-index)
 
     def bold_line(self,index):
-        #gets index of line in text_lines
+        """bold index of line in text_lines"""
         if index<len(self.text_lines):
             index = self.calculate_index(index)
-            [label.configure(text_color="pink",font=('Roboto',40)) if i<index else label.configure(text_color="white",font=('Roboto',40)) for i,label in enumerate(self.labels)]
-            self.labels[index].configure(text_color="red",font=('Roboto',53))
+            [label.configure(text_color="#FFBABA",font=('Roboto',35)) if i<index else label.configure(text_color="white",font=('Roboto',35)) for i,label in enumerate(self.labels)]
+            self.labels[index].configure(text_color="#C85C8E",font=('Roboto',37))
 
 
 class KarayokePageNO(ctk.CTkFrame):
     def __init__(self, master):
-        self.CONNECTING = False
-        self.LOGGED = False
-        self.Play = False
-        global SONG,LYRICS,TIMES,LINE_COUNT
+        global SONG,LYRICS,LINE_COUNT
         ctk.CTkFrame.__init__(self, master)
         self.place(anchor='center', relx=0.5, rely=0.5, relheight=0.95, relwidth=0.95)
+        
+        filee_copy = io.BytesIO(SONG.getvalue())
 
+        pygame.mixer.init()
+        pygame.mixer.music.load(SONG,'ogg')
+
+        SONG.seek(0)
+
+        self.text_lines = LYRICS
+        self.text_lines = [equlize_words(line[:-1]) if line[-1]=='\n' else equlize_words(line) for line in self.text_lines if line != "\n"]
+        
+        self.labels = [ctk.CTkLabel(self,text_color="white" ,text=self.text_lines[i],font=('Roboto',35)) for i in range(LINE_COUNT)]
+        for i,label in enumerate(self.labels):
+            label.place(anchor="w",relx=0.025,rely=0.1+0.11*i)
+        
+
+        self.play_button = ctk.CTkButton(self, text="Play", command=self.play_music,fg_color="#7B2869",hover_color="#9D3C72")
+        self.pause_button = ctk.CTkButton(self, text="Pause", command=self.pause_music,fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.play_button.place(anchor='se',relx=0.53,rely=0.90,relwidth=0.025)
+        self.pause_button.place(anchor='sw',relx=0.47,rely=0.90,relwidth=0.025)
+
+        self.audio_length = pygame.mixer.Sound(filee_copy).get_length()
+
+        self.time_slider = ctk.CTkSlider(self, from_=0, to=self.audio_length, orientation="horizontal",command=self.update_start,button_color="#7B2869",button_hover_color="#9D3C72")#, number_of_steps=round(audio_length//0.1)
+        self.time_slider.set(pygame.mixer.music.get_pos())
+        self.time_slider.place(anchor="n",relx=0.5,rely=0.90,relwidth=0.7)
+        self.start = 0
+
+        self.update_id = None
+
+        self.scroll_index = 0
+
+        self.bind("<MouseWheel>", self.mouse_scroll)
+        self.back_button = ctk.CTkButton(self, text="Back", command=lambda: master.switch_frame(SearchPage),fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.back_button.place(anchor="e",relx=0.95,rely=0.02)    
+
+        self.exit_kar = ctk.CTkButton(self, text="Exit", command=self.exit_karyoke,fg_color="#7B2869",hover_color="#9D3C72")
+
+        self.exit_kar.place(anchor="e",relx=0.95,rely=0.03)
+
+    def exit_karyoke(self):
+        global SOCK,Encryptor
+        Encryptor.send_msg(SOCK,"","EXT")
+        self.quit()
+
+
+    def update_start(self,value):
+        if not pygame.mixer.music.get_busy():
+            self.start = value
+
+    def pause_music(self):
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.pause()
+            self.after_cancel(self.update_id)
+            self.update_slider(False)
+            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+            self.start = self.start+pygame.mixer.music.get_pos()/1000
+            pygame.mixer.music.stop()  
+
+    def play_music(self):
+        if not pygame.mixer.music.get_busy():
+            cur_time = self.time_slider.get()
+            pygame.mixer.music.play(start=cur_time)
+            self.update_id = self.after(0,self.update_slider,True)
+
+    def update_slider(self,again: bool):
+        if pygame.mixer.music.get_busy():
+            self.time_slider.set(self.start+pygame.mixer.music.get_pos()/1000)
+        if again:
+            self.update_id = self.after(10,self.update_slider,True)
+    
+
+    def update_labels(self):
+        value = self.scroll_index
+
+        if value>floor(LINE_COUNT/2) and value<=len(self.text_lines)-ceil(LINE_COUNT/2):
+            for i in range(LINE_COUNT):
+                self.labels[i].configure(text=self.text_lines[value-floor(LINE_COUNT/2) + i],text_color="white",font=('Roboto',35))
+        elif value<=floor(LINE_COUNT/2):
+            for i in range(LINE_COUNT):
+                self.labels[i].configure(text=self.text_lines[i],text_color="white",font=('Roboto',35))
+        elif value>len(self.text_lines)-ceil(LINE_COUNT/2):
+            for i in range(LINE_COUNT):
+                self.labels[i].configure(text=self.text_lines[len(self.text_lines)-LINE_COUNT+i],text_color="white",font=('Roboto',35))
+
+
+
+    def mouse_scroll(self, event):
+        if event.delta > 0:
+            self.scroll_index = max(0,self.scroll_index - 1)
+        else:
+            self.scroll_index =min(len(self.text_lines),self.scroll_index + 1)
+
+        self.update_labels()
 
 if __name__ == "__main__":
     app = App()
