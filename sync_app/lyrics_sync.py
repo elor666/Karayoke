@@ -1,9 +1,11 @@
 import customtkinter as tk
-import pygame
 from youtube_lyrics import search_result,download_song_lyrics
 import os
 import threading
-
+from sync import auto_sync_lyrics
+import contextlib
+with contextlib.redirect_stdout(None):
+    import pygame
 
 
 SONG_PATH = ""
@@ -213,6 +215,13 @@ class SearchPage(tk.CTkFrame):
         self.values = []
         self.choice = ""
 
+        self.auto_sync = tk.BooleanVar() 
+        self.auto_sync_box = tk.CTkCheckBox(self,text="Auto Sync",variable=self.auto_sync,onvalue=True,offvalue=False,state="disabled")
+
+        self.auto_sync_box.place(anchor='center', relx=0.2, rely=0.55)
+
+        self.AUTO_SYNCED = False
+
         self.songs_menu = tk.CTkOptionMenu(self, values=[],command=self.optionmenu_callback,
         fg_color="#7B2869", 
         button_color="#7B2869", 
@@ -244,6 +253,7 @@ class SearchPage(tk.CTkFrame):
     def optionmenu_callback(self,choice):
         print("optionmenu clicked:", choice)
         self.choice = choice
+        self.auto_sync_box.configure(state="normal")
         self.enable_sync()
     
 
@@ -274,28 +284,35 @@ class SearchPage(tk.CTkFrame):
                     self.choice = ""
 
                     self.enable_sync()
+                    self.auto_sync_box.configure(state="normal")
             else:
                 self.values = result
                 self.songs_menu.configure(values=self.values)
                 self.insert_results(result)
                 self.disable_sync()
+                self.auto_sync_box.configure(state="disabled")
         self.enable_search()
 
 
     def end_sync(self,thread: threading.Thread,root):
         thread.join(timeout=0.2)
         if thread.is_alive():
-            root.after(500,self.end_sync,thread,root)
+            root.after(2000,self.end_sync,thread,root)
         else:
             print("thread ended")
-            self.enable_sync()
-            self.enable_search()
-            self.enable_menu()
             global SONG_PATH
-            if SONG_PATH != "":
+            if self.AUTO_SYNCED:
+                self.quit()
+            elif SONG_PATH != "":
                 root.switch_frame(SyncPage)
+            else:
+                self.auto_sync_box.configure(state="normal")
+                self.enable_sync()
+                self.enable_search()
+                self.enable_menu()
 
     def try_sync(self,root):
+        self.auto_sync_box.configure(state="disabled")
         self.disable_sync()
         self.disable_search()
         self.disable_menu()
@@ -319,6 +336,16 @@ class SearchPage(tk.CTkFrame):
         else:
             create_song_dir(artist,song)
             SONG_PATH = "Songs\\"+artist.lower()+" "+song.lower()+".ogg"
+        
+        if self.auto_sync.get():
+            #try:
+            if not auto_sync_lyrics(artist,song):
+                self.auto_sync_box.configure(state="disabled")
+            else:
+                self.AUTO_SYNCED = True
+            """except Exception as err:
+                SONG_PATH = ""
+                self.AUTO_SYNCED = False"""
 
     def disable_search(self):
         self.search_button.configure(state="disabled",fg_color="#808080")
@@ -338,6 +365,6 @@ class SearchPage(tk.CTkFrame):
     def enable_menu(self):
         self.songs_menu.configure(state="normal",button_color="#7B2869")    
     
-
-app = SyncApp()
-app.mainloop()
+if __name__ == '__main__':
+    app = SyncApp()
+    app.mainloop()
