@@ -3,6 +3,7 @@ from enum import Enum
 import os
 from pathlib import Path
 import os
+from pydub import AudioSegment
 
 class Codec(str, Enum):
     """Enumeration of supported audio codec."""
@@ -22,7 +23,10 @@ def separate_song(path,artist,song):
     if not Path(f"SongsDetails\\{artist} {song}\\accompaniment.ogg").is_file():
       separator = Separator('spleeter:2stems')
       separator.separate_to_file(path, "SongsDetails",codec='ogg')
-      os.remove(f"SongsDetails\\{artist} {song}\\voacls.ogg")
+
+      audio_vocals = AudioSegment.from_file(f"SongsDetails\\{artist} {song}\\vocals.ogg")
+      audio_vocals.export(f"SongsDetails\\{artist} {song}\\vocals.mp3",format="mp3")
+      os.remove(f"SongsDetails\\{artist} {song}\\vocals.ogg")
 
 #test
 def main():

@@ -8,9 +8,12 @@ import base64
 from io import BytesIO
 from pathlib import Path
 from split import separate_song
+from sync import auto_sync_lyrics
 
 FINISH = False
 DATA_BASE = None
+
+SONG_LOCK = threading.Lock()
 
 def encrypt_connection(sock:socket.socket):
   pub, priv = encryption.generate_RSA_keys()
@@ -102,28 +105,45 @@ def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
       encryptor.send_msg(sock,base64.b64encode(pickle.dumps(result)).decode(),"SCH")
 
     elif code == "RES" or code == "REV":
-      msg = int(msg)
+      choice,auto_sync = int(msg.split(b"#")[0]),int(msg.split(b"#")[1])
       if not MY_SONG:
-        out_file = download_song_lyrics(artist,song,msg)
+        SONG_LOCK.acquire()
+        out_file = download_song_lyrics(artist,song,choice)
+        SONG_LOCK.release()
       else:
         out_file = f"Songs\\{artist} {song}.ogg"
       
       if code == "REV" and out_file:
+        SONG_LOCK.acquire()
         separate_song(out_file,artist,song)
+        SONG_LOCK.release()
         out_file = f"SongsDetails\\{artist} {song}\\accompaniment.ogg"
 
       if out_file:
+        #sends song file
         pickled_file = get_fileobject(out_file)
 
         print("File pickled")
 
         encryptor.send_msg(sock,pickled_file,"RES")
+
+        #sends details
         if Path(f"SongsDetails\\{artist} {song}\\times.txt").is_file():
           encryptor.send_msg(sock,"1","SYC")
           times = get_times(f"SongsDetails\\{artist} {song}\\times.txt")
           encryptor.send_msg(sock,times,"TIM")
         else:
-          encryptor.send_msg(sock,"0","SYC")
+          if auto_sync:
+            SONG_LOCK.acquire()
+            if auto_sync_lyrics(artist,song):
+              encryptor.send_msg(sock,"1","SYC")
+              times = get_times(f"SongsDetails\\{artist} {song}\\times.txt")
+              encryptor.send_msg(sock,times,"TIM")
+            else:
+              encryptor.send_msg(sock,"0","SYC")
+            SONG_LOCK.release()
+          else:
+            encryptor.send_msg(sock,"0","SYC")
         
         lyrics = get_lyr(f"SongsDetails\\{artist} {song}\\lyrics.txt")
         encryptor.send_msg(sock,lyrics,"LYC")
