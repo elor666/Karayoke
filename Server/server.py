@@ -1,19 +1,21 @@
+import base64
+import pickle
 import socket
 import threading
-import encryption
-from database import DataBase
-from lyrics import search_result,download_song_lyrics
-import pickle
-import base64
 from io import BytesIO
 from pathlib import Path
+
+import encryption
+from database import DataBase
+from lyrics import download_song_lyrics, search_result
 from split import separate_song
 from sync import auto_sync_lyrics
 
+
 FINISH = False
 DATA_BASE = None
-
 SONG_LOCK = threading.Lock()
+
 
 def encrypt_connection(sock:socket.socket):
   pub, priv = encryption.generate_RSA_keys()
@@ -52,6 +54,8 @@ def login_register_loop(sock: socket.socket,encryptor : encryption.AESCipher):
         print(user,password,res)
         encryptor.send_msg(sock,"","SUC")
         finish = True
+      elif cod == "EXT":
+        return False
       else:
         encryptor.send_msg(sock,"","FAL")
   except Exception as err:
@@ -59,6 +63,7 @@ def login_register_loop(sock: socket.socket,encryptor : encryption.AESCipher):
     return False
   
   return True
+
 
 def get_fileobject(out_file):
   file_object = BytesIO()
@@ -73,6 +78,7 @@ def get_fileobject(out_file):
 
     return pickled_file
 
+
 def get_times(times_path):
   with open(times_path,"r") as f:
     time_list = f.readlines()
@@ -85,6 +91,7 @@ def get_lyr(path):
     lyrics = f.readlines()
   lyrics = [line[:-1] if line[-1]=='\n' else line for line in lyrics if line != "\n"]
   return base64.b64encode(pickle.dumps(lyrics)).decode()
+
 
 def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
   artist = ""
@@ -162,17 +169,16 @@ def handle_client(sock:socket.socket):
     print("Connected to client with", encryptor)
     
     if not login_register_loop(sock,encryptor):
-      raise Exception("Faild to Login")
+      raise Exception("Login Ended")
 
     if not song_search_loop(sock,encryptor):
-      raise Exception("Search Error")
+      raise Exception("Search Ended")
 
     print("Client logged to the server")
 
   except Exception as err:
     print(err)
     
-
 
 def client_disconnect(threads):
   for t,cli in threads:

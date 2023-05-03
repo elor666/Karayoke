@@ -1,9 +1,10 @@
-from spleeter.separator import Separator
+import os
 from enum import Enum
-import os
 from pathlib import Path
-import os
+
 from pydub import AudioSegment
+from spleeter.separator import Separator
+
 
 class Codec(str, Enum):
     """Enumeration of supported audio codec."""
