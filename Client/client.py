@@ -456,7 +456,7 @@ class KarayokePage(ctk.CTkFrame):
 
         self.exit_kar = ctk.CTkButton(self, text="Exit", command=self.exit_karyoke,fg_color="#7B2869",hover_color="#9D3C72")
 
-        self.exit_kar.place(anchor="e",relx=0.95,rely=0.03)
+        self.exit_kar.place(anchor="e",relx=0.95,rely=0.07)
 
     def exit_karyoke(self):
         global SOCK,Encryptor
@@ -626,7 +626,7 @@ class KarayokePageNO(ctk.CTkFrame):
 
         self.exit_kar = ctk.CTkButton(self, text="Exit", command=self.exit_karyoke,fg_color="#7B2869",hover_color="#9D3C72")
 
-        self.exit_kar.place(anchor="e",relx=0.95,rely=0.03)
+        self.exit_kar.place(anchor="e",relx=0.95,rely=0.07)
 
     def exit_karyoke(self):
         global SOCK,Encryptor
