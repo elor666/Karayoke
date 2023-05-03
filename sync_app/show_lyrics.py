@@ -36,10 +36,10 @@ class TimedLyrics(tk.CTk):
         pygame.mixer.init()
         pygame.mixer.music.load("Songs\\"+file_path+".ogg")
         
-        with open("SongsDetails\\"+self.file_path+"\\lyrics.txt", 'r') as f:
+        with open("SongsDetails\\"+self.file_path+"\\lyrics.txt", 'r',encoding="UTF-8") as f:
             self.text_lines = f.readlines()
         self.text_lines = [equlize_words(line[:-1]) if line[-1]=='\n' else equlize_words(line) for line in self.text_lines if line != "\n"]
-
+        
         self.scroll_index = 0
 
         with open("SongsDetails\\"+self.file_path+"\\times.txt", 'r') as f:
@@ -197,9 +197,10 @@ class Lyrics(tk.CTk):
         pygame.mixer.init()
         pygame.mixer.music.load("Songs\\"+file_path+".ogg")
         
-        with open("SongsDetails\\"+self.file_path+"\\lyrics.txt", 'r') as f:
+        with open("SongsDetails\\"+self.file_path+"\\lyrics.txt", 'r',encoding="UTF-8") as f:
             self.text_lines = f.readlines()
         self.text_lines = [equlize_words(line[:-1]) if line[-1]=='\n' else equlize_words(line) for line in self.text_lines if line != "\n"]
+        
 
         self.labels = [tk.CTkLabel(self,text_color="white" ,text=self.text_lines[i],font=('Roboto',35)) for i in range(LINE_COUNT)]
         for i,label in enumerate(self.labels):
@@ -277,6 +278,6 @@ class Lyrics(tk.CTk):
         self.update_labels()
 
 if __name__ == "__main__":
-    app = TimedLyrics(r"kid laroi stay")
-    #app = Lyrics("kid laroi stay")
+    #app = Lyrics(r"kid laroi stay")
+    app = TimedLyrics("guilty gear xrd big blast sonic")
     app.mainloop()

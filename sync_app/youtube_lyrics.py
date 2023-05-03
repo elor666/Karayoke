@@ -1,18 +1,18 @@
-from youtubesearchpython import VideosSearch
-from pytube import YouTube
-from pydub import AudioSegment
-from bs4 import BeautifulSoup
-import requests
-from pathlib import Path
-from io import BytesIO
 import os
-from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-import time
-import subprocess
 import tempfile
+import time
+from io import BytesIO
+from pathlib import Path
+
+import requests
+from bs4 import BeautifulSoup
+from pydub import AudioSegment
+from pytube import YouTube
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+from youtubesearchpython import VideosSearch
 
 Num_Search = 5
 Max_duration = 420 #7 minutes long
