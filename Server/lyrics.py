@@ -67,7 +67,6 @@ def download_youtube(url:str,directory:str):
       pass
   download_wait(directory,240)
 
-  print("finished")
 
 
 
@@ -94,7 +93,6 @@ def extract_lyrics(artist_name, song_name):
                 with open(f"SongsDetails//{artist_name.lower()} {song_name.lower()}//lyrics.txt","w") as file:
                     file.write(lyrics)
         
-                print("Got Lyrics")
                 return True
         
         return False
@@ -135,10 +133,9 @@ def download_song_lyrics(artist_name, song_name, search_index):
                 #for i in r["result"]:
                     #print(i)
                     #print("link",i["link"])
-                url = r["result"][search_index]["link"]
-                print(r["result"][search_index]["title"])
+                results = [r["result"][i]["link"] for i in range(len(r["result"])) if not str_time(r['result'][i]['duration']) > Max_duration]
+                url = results[search_index]
 
-                print(url)
                 data = BytesIO()
                 yt = YouTube(url)
                 strem = yt.streams.filter(only_audio=True).asc()[0]

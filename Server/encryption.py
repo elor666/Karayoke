@@ -7,7 +7,7 @@ from Crypto import Random
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.PublicKey import RSA
 
-DEBUG = True
+DEBUG = False
 
 
 BS = 16
@@ -36,8 +36,6 @@ class AESCipher:
     def send_msg(self,sock:socket.socket,msg : str,code : str):
 
         enc_msg = self.encrypt(code+msg)
-
-        print(enc_msg)
 
         len_msg = str(len(enc_msg)).zfill(10).encode()
 

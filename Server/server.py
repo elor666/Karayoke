@@ -44,14 +44,12 @@ def login_register_loop(sock: socket.socket,encryptor : encryption.AESCipher):
       if cod == "LOG":
         user,password = msg.decode().split("#")
         res = DATA_BASE.login(user,password)
-        print(res)
       elif cod == "REG":
         user,password = msg.decode().split("#")
         res = DATA_BASE.register(user,password)
       else:
         encryptor.send_msg(sock,"","FAL")
       if res:
-        print(user,password,res)
         encryptor.send_msg(sock,"","SUC")
         finish = True
       elif cod == "EXT":
@@ -108,7 +106,6 @@ def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
         MY_SONG = True
       else:
         MY_SONG = False
-      print(result,MY_SONG)
       encryptor.send_msg(sock,base64.b64encode(pickle.dumps(result)).decode(),"SCH")
 
     elif code == "RES" or code == "REV":
@@ -174,7 +171,7 @@ def handle_client(sock:socket.socket):
     if not song_search_loop(sock,encryptor):
       raise Exception("Search Ended")
 
-    print("Client logged to the server")
+    print("Client disconnected from the server")
 
   except Exception as err:
     print(err)
