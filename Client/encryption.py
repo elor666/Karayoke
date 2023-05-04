@@ -8,7 +8,7 @@ import hashlib
 import socket
 
 
-DEBUG = True
+DEBUG = False
 
 
 BS = 16

@@ -42,7 +42,7 @@ def equlize_words(sentence : str,limit=110):
 
 class App(ctk.CTk):
     def __init__(self):
-        ctk.set_appearance_mode("dark")
+        #ctk.set_appearance_mode("dark")
         #ctk.set_default_color_theme("dark-blue")
         ctk.CTk.__init__(self)
         self.attributes('-fullscreen', True)
@@ -88,14 +88,13 @@ class ConnectPage(ctk.CTkFrame):
     
     def connect_server(self,root : ctk.CTk,ip_entry, port_entry):
             self.connect_button.configure(state=ctk.DISABLED, fg_color="#808080")
-            ip = "127.0.0.1" #ip_entry.get()
-            port = "12000"#port_entry.get()
+            ip = ip_entry.get()
+            port = port_entry.get()
             
             if port.isdigit() and all(ch in "1234567890." for ch in ip):
                 connection_thread = threading.Thread(target=self.try_connection, args=(ip, int(port)))
                 connection_thread.start()
                 root.after(2000, self.conclude_connection, root, connection_thread)
-                print(ip, port)
             else:
                 print("Error")
 
@@ -333,7 +332,6 @@ class SearchPage(ctk.CTkFrame):
 
     
     def optionmenu_callback(self,choice):
-        print("optionmenu clicked:", choice)
         self.choice = choice
     
 
@@ -357,7 +355,6 @@ class SearchPage(ctk.CTkFrame):
             if code == "RES":
                 msg = base64.b64decode(msg)
                 SONG = pickle.loads(msg)
-                print(SONG)
             else:
                 raise Exception("ErrorRES")
             code, msg = Encryptor.recieve_msg(SOCK)
@@ -368,31 +365,25 @@ class SearchPage(ctk.CTkFrame):
                     if code == "TIM":
                         msg = base64.b64decode(msg)
                         TIMES = pickle.loads(msg) #List of times
-                        print(TIMES)
                     else:
                         raise Exception("ErrorTIMES")
                 else:
                     sync = False
                 
                 IS_SYNC = sync
-                print(sync)
             else:
                 raise Exception("ErrorSYNC")
 
             code, msg = Encryptor.recieve_msg(SOCK)
-            print(code)
             if code == "LYC":
                 msg = base64.b64decode(msg)
                 LYRICS = pickle.loads(msg) #List of lyrics
-                print(LYRICS)
             else:
                 raise Exception("ErrorLYRICS")
             
             self.FINISH = True
         except Exception as err:
             print(err)
-        
-        self.enable_buttons()
 
     
     def disable_buttons(self):
@@ -450,7 +441,7 @@ class KarayokePage(ctk.CTkFrame):
         self.time_label = ctk.CTkLabel(self,text_color="white" ,text="0",font=('Roboto',25))
         self.time_label.place(anchor="n",relx=0.5,rely=0.915)
         
-        self.back_button = ctk.CTkButton(self, text="Back", command=lambda: master.switch_frame(SearchPage),fg_color="#7B2869",hover_color="#9D3C72")
+        self.back_button = ctk.CTkButton(self, text="Back", command=lambda: self.back(master),fg_color="#7B2869",hover_color="#9D3C72")
 
         self.back_button.place(anchor="e",relx=0.95,rely=0.02)    
 
@@ -460,9 +451,13 @@ class KarayokePage(ctk.CTkFrame):
 
     def exit_karyoke(self):
         global SOCK,Encryptor
+        self.pause_music()
         Encryptor.send_msg(SOCK,"","EXT")
         self.quit()
-        
+    
+    def back(self,master):
+        self.pause_music()
+        master.switch_frame(SearchPage)
 
     def mouse_scroll(self, event):
         if not pygame.mixer.music.get_busy():
@@ -620,7 +615,7 @@ class KarayokePageNO(ctk.CTkFrame):
         self.scroll_index = 0
 
         self.bind("<MouseWheel>", self.mouse_scroll)
-        self.back_button = ctk.CTkButton(self, text="Back", command=lambda: master.switch_frame(SearchPage),fg_color="#7B2869",hover_color="#9D3C72")
+        self.back_button = ctk.CTkButton(self, text="Back", command=lambda: self.back(master),fg_color="#7B2869",hover_color="#9D3C72")
 
         self.back_button.place(anchor="e",relx=0.95,rely=0.02)    
 
@@ -633,7 +628,11 @@ class KarayokePageNO(ctk.CTkFrame):
         Encryptor.send_msg(SOCK,"","EXT")
         self.quit()
 
-
+    def back(self,master):
+        self.pause_music()
+        master.switch_frame(SearchPage)
+        
+        
     def update_start(self,value):
         if not pygame.mixer.music.get_busy():
             self.start = value
