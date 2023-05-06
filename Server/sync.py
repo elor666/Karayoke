@@ -165,7 +165,9 @@ def auto_sync_lyrics(artist, song):
 
     lyrics = merge_dup(times,lyrics)
 
-    if len(lyrics)/length_of_lyrics>0.01 and len([True for line in lyrics if len(line.split("\n"))<3])==0:
+    print(lyrics)
+    
+    if len([True for line in lyrics if len(line)>330])==0:
         times = sorted(list(set(times)))
 
         times[0] = detect_start(times[1],f"SongsDetails\\{artist} {song}")
@@ -184,7 +186,7 @@ def auto_sync_lyrics(artist, song):
 
 
 if __name__ == '__main__':
-    auto_sync_lyrics("kid laroi", "stay")#("ed sheeran","shape of you")
+    auto_sync_lyrics("ed sheeran","shape of you")#("kid laroi", "stay")#
 
 
 
