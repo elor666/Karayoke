@@ -1,10 +1,11 @@
-import whisper
-from pydub import AudioSegment,silence
-import os
-from pathlib import Path
-from spleeter.separator import Separator
-import string
 import contextlib
+import os
+import string
+from pathlib import Path
+
+import whisper
+from pydub import AudioSegment, silence
+from spleeter.separator import Separator
 
 
 def split_song(artist_name,song_name):
@@ -164,7 +165,9 @@ def auto_sync_lyrics(artist, song):
 
     lyrics = merge_dup(times,lyrics)
 
-    if len(lyrics)/length_of_lyrics>0.01 and len([True for line in lyrics if len(line.split("\n"))<3])==0:
+    print(lyrics)
+    
+    if len([True for line in lyrics if len(line)>330])==0:
         times = sorted(list(set(times)))
 
         times[0] = detect_start(times[1],f"SongsDetails\\{artist} {song}")
@@ -182,8 +185,8 @@ def auto_sync_lyrics(artist, song):
     return False
 
 
-"""if __name__ == '__main__':
-    auto_sync_lyrics("kid laroi", "stay")#("ed sheeran","shape of you")"""
+if __name__ == '__main__':
+    auto_sync_lyrics("ed sheeran","shape of you")#("kid laroi", "stay")#
 
 
 

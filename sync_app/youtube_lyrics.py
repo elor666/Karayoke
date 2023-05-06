@@ -67,7 +67,9 @@ def download_youtube(url:str,directory:str):
       pass
   download_wait(directory,240)
 
-  print("finished")
+
+
+
 
 def extract_lyrics(artist_name, song_name):
     """downloads lyrics if have them on the site 'azlyrics.com' and if not downloaded yet."""
@@ -91,7 +93,6 @@ def extract_lyrics(artist_name, song_name):
                 with open(f"SongsDetails//{artist_name.lower()} {song_name.lower()}//lyrics.txt","w") as file:
                     file.write(lyrics)
         
-                print("Got Lyrics")
                 return True
         
         return False
@@ -132,7 +133,8 @@ def download_song_lyrics(artist_name, song_name, search_index):
                 #for i in r["result"]:
                     #print(i)
                     #print("link",i["link"])
-                url = r["result"][search_index]["link"]
+                results = [r["result"][i]["link"] for i in range(len(r["result"])) if not str_time(r['result'][i]['duration']) > Max_duration]
+                url = results[search_index]
 
                 data = BytesIO()
                 yt = YouTube(url)
@@ -145,18 +147,15 @@ def download_song_lyrics(artist_name, song_name, search_index):
                 return path_file
             except Exception as err:
                 print(err)
-                if str(err)=="'NoneType' object has no attribute 'span'":
-                    print("Youtube changed their api. No support for pytube.")
+                temp = tempfile.TemporaryDirectory()
+                download_youtube(url,temp.name)
+                fpath = f"{temp.name}\\{os.listdir(temp.name)[0]}"
+                AudioSegment.from_file(fpath).export(r"Songs/"+f"{artist_name} {song_name}"+".ogg",format="ogg")
+                os.remove(fpath)
+                temp.cleanup()
+                return f"Songs\\{artist_name} {song_name}.ogg"
 
-                    temp = tempfile.TemporaryDirectory()
-                    download_youtube(url,temp.name)
-                    fpath = f"{temp.name}\\{os.listdir(temp.name)[0]}"
-                    AudioSegment.from_file(fpath).export(r"Songs/"+f"{artist_name} {song_name}"+".ogg",format="ogg")
-                    os.remove(fpath)
-                    temp.cleanup()
-                    return f"Songs\\{artist_name} {song_name}.ogg"
-
-        return f"Songs\\{artist_name} {song_name}.ogg"
+        return f"Songs\\{artist_name} {song_name}.ogg"        
     
     return False
 
@@ -178,6 +177,6 @@ def search_result(artist_name, song_name):
 	
 
 #get_song_text("stellar", "cold outside")
-#print(download_song_lyrics("elley duh","money on the dash",0))
+
 #print(new_file)
 #print(strem)
