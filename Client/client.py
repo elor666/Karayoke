@@ -40,6 +40,8 @@ def equlize_words(sentence : str,limit=110):
     return new_sentence[1:]
 
 
+
+
 class App(ctk.CTk):
     def __init__(self):
         #ctk.set_appearance_mode("dark")
@@ -161,6 +163,12 @@ class LoginPage(ctk.CTkFrame):
         #ctk.CTkButton(self, text="Return to start page",
         #          command=lambda: master.switch_frame(ConnectPage)).pack()
     
+    
+    def send_msg_tk(self,Encryptor : encryption.AESCipher,sock,msg,code):
+        try:
+            Encryptor.send_msg(sock,msg,code)
+        except ConnectionResetError as err:
+            self.quit()
 
     def connect_server(self,root,user_entry,password_entry,state):  
         user_entry.configure(state=ctk.DISABLED)
@@ -190,7 +198,7 @@ class LoginPage(ctk.CTkFrame):
             cod = "REG"
         else:
             cod = "LOG"
-        Encryptor.send_msg(SOCK,user+"#"+password,cod)
+        self.send_msg_tk(Encryptor,SOCK,user+"#"+password,cod)
 
         code,msg = Encryptor.recieve_msg(SOCK)
         if code == "SUC":
@@ -277,9 +285,16 @@ class SearchPage(ctk.CTkFrame):
 
         self.exit_kar.place(anchor="e",relx=0.95,rely=0.02)
 
+    def send_msg_tk(self,Encryptor,sock,msg,code):
+        try:
+            Encryptor.send_msg(sock,msg,code)
+        except ConnectionResetError as err:
+            self.quit()
+    
+    
     def exit_karyoke(self):
         global SOCK,Encryptor
-        Encryptor.send_msg(SOCK,"","EXT")
+        self.send_msg_tk(Encryptor,SOCK,"","EXT")
         self.quit()
 
     def get_search(self,root):
@@ -293,7 +308,7 @@ class SearchPage(ctk.CTkFrame):
             song = self.song_entry.get().lower()
 
             if all(ch not in "#" for ch in artist) and all(ch not in "#" for ch in song):
-                Encryptor.send_msg(SOCK,f"{artist}#{song}","SCH")
+                self.send_msg_tk(Encryptor,SOCK,f"{artist}#{song}","SCH")
                 search_thread = threading.Thread(target=self.get_lst_songs)
                 search_thread.start()
 
@@ -347,9 +362,9 @@ class SearchPage(ctk.CTkFrame):
         global SONG,LYRICS,TIMES,IS_SYNC
         msg_to_send = str(self.values.index(self.choice))+"#"+str(int(self.auto_sync.get()))
         if not self.no_vocals.get():
-            Encryptor.send_msg(SOCK,msg_to_send,"RES")
+            self.send_msg_tk(Encryptor,SOCK,msg_to_send,"RES")
         else:
-            Encryptor.send_msg(SOCK,msg_to_send,"REV")
+            self.send_msg_tk(Encryptor,SOCK,msg_to_send,"REV")
         try:
             code, msg = Encryptor.recieve_msg(SOCK)
             if code == "RES":
@@ -452,7 +467,7 @@ class KarayokePage(ctk.CTkFrame):
     def exit_karyoke(self):
         global SOCK,Encryptor
         self.pause_music()
-        Encryptor.send_msg(SOCK,"","EXT")
+        self.send_msg_tk(Encryptor,SOCK,"","EXT")
         self.quit()
     
     def back(self,master):
@@ -625,7 +640,7 @@ class KarayokePageNO(ctk.CTkFrame):
 
     def exit_karyoke(self):
         global SOCK,Encryptor
-        Encryptor.send_msg(SOCK,"","EXT")
+        self.send_msg_tk(Encryptor,SOCK,"","EXT")
         self.quit()
 
     def back(self,master):

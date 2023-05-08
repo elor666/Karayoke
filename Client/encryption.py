@@ -8,8 +8,8 @@ import hashlib
 import socket
 
 
-DEBUG = False
-
+DEBUG = True
+MAX_LEN_PRINT = 100
 
 BS = 16
 def pad(s): return s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
@@ -48,18 +48,38 @@ class AESCipher:
 
     def recieve_msg(self,sock:socket.socket):
         """Return msg code, msg in bytes"""
-        len_msg = int(sock.recv(10))
+        
+        len_msg = b''
+        
+        while len(len_msg) < 10:
+            _s = sock.recv(10-len(len_msg))
+            if _s == b'':
+                len_msg = b''
+                break
+            len_msg += _s
+        
+        len_msg = int(len_msg) if len_msg != b'' else b''
+        
+        enc_msg = b''
+        if len_msg != b'':
+            while len(enc_msg) < len_msg:
+                _d = sock.recv(len_msg-len(enc_msg))
+                
+                if _d == b'':
+                    enc_msg = b''
+                    break
+                
+                enc_msg += _d
 
-        #code = str(sock.recv(3))
-
-        enc_msg = sock.recv(len_msg)
-
+        if enc_msg == b'':
+            raise Exception("DISCONNECT")
+        
         dec_msg = self.decrypt(enc_msg)
         code,msg = dec_msg[:3], dec_msg[3:]
 
         if DEBUG:
-            print("recived>>",code.decode(),msg)
-
+            print("recived>>",code.decode(),msg[:min(len(msg),MAX_LEN_PRINT)])
+            
         return code.decode(),msg
 
 
