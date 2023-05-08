@@ -1,4 +1,5 @@
 import base64
+import logging
 import pickle
 import socket
 import threading
@@ -10,7 +11,6 @@ from database import DataBase
 from lyrics import download_song_lyrics, search_result
 from split import separate_song
 from sync import auto_sync_lyrics
-
 
 FINISH = False
 DATA_BASE = None
@@ -156,8 +156,8 @@ def song_search_loop(sock: socket.socket,encryptor : encryption.AESCipher):
       return True
 
 
-def handle_client(sock:socket.socket):
-  print("started to handle client")
+def handle_client(sock:socket.socket, id:int):
+  print(f"started to handle client {id}")
   try:
     encryptor = encrypt_connection(sock)
     if not encryptor:
@@ -180,7 +180,7 @@ def handle_client(sock:socket.socket):
 def client_disconnect(threads):
   for t,cli in threads:
     pass
-
+  
 
 def main():
   global FINISH
@@ -198,13 +198,16 @@ def main():
   threads = []
 
   print("waiting for clients!")
+  
+  i = 1
 
   while not FINISH:
     cli, addr = sock.accept()
     print(addr,"connected")
-    t = threading.Thread(target=handle_client, args=[cli])
+    t = threading.Thread(target=handle_client, args=[cli,i])
     t.start()
     threads.append([t,cli])
+    i+=1
 
 
 if __name__ == '__main__':
