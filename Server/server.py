@@ -26,10 +26,43 @@ def encrypt_connection(sock:socket.socket):
   len_msg = str(len(pub)).zfill(10).encode()
   sock.send(len_msg+b'PUB'+pub)
 
-  len_msg = int(sock.recv(10))
-  code = (sock.recv(3)).decode()
+  #len_msg = int(sock.recv(10))
+  len_msg = b''
+        
+  while len(len_msg) < 10:
+    _s = sock.recv(10-len(len_msg))
+    if _s == b'':
+      len_msg = b''
+      break
+    len_msg += _s
+        
+  len_msg = int(len_msg) if len_msg != b'' else b''
+  
+  code = b''
+        
+  while len(code) < 3:
+    _s = sock.recv(3-len(code))
+    if _s == b'':
+      code = b''
+      break
+    code += _s
+        
+  code = code.decode()
+  
+  #code = (sock.recv(3)).decode()
   if code == "PUB":
-    rsa_num = sock.recv(len_msg)
+    #rsa_num = sock.recv(len_msg)
+    rsa_num = b''
+    if len_msg != b'':
+      while len(rsa_num) < len_msg:
+        _d = sock.recv(len_msg-len(rsa_num))
+                    
+        if _d == b'':
+          rsa_num = b''
+          break
+                    
+        rsa_num += _d
+        
     return encryption.generate_AESk_fpriv(priv,rsa_num)
   else:
     return False
