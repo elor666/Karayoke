@@ -44,8 +44,8 @@ def equlize_words(sentence : str,limit=110):
 
 class App(ctk.CTk):
     def __init__(self):
-        #ctk.set_appearance_mode("dark")
-        #ctk.set_default_color_theme("dark-blue")
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue")
         ctk.CTk.__init__(self)
         self.attributes('-fullscreen', True)
         self._frame = None
@@ -120,12 +120,40 @@ class ConnectPage(ctk.CTkFrame):
         
         try:
             self.sock.connect((ip,port))
-
-            len_msg = int(self.sock.recv(10))
-            code = (self.sock.recv(3)).decode()
+            len_msg = b''
+        
+            while len(len_msg) < 10:
+                _s = self.sock.recv(10-len(len_msg))
+                if _s == b'':
+                    len_msg = b''
+                    break
+                len_msg += _s
+        
+            len_msg = int(len_msg) if len_msg != b'' else b''
+            
+            code = b''
+        
+            while len(code) < 3:
+                _s = self.sock.recv(3-len(code))
+                if _s == b'':
+                    code = b''
+                    break
+                code += _s
+        
+            code = code.decode()
+            
+            
             if code == "PUB":
-                pub = self.sock.recv(len_msg)
-
+                pub = b''
+                if len_msg != b'':
+                    while len(pub) < len_msg:
+                        _d = self.sock.recv(len_msg-len(pub))
+                    
+                        if _d == b'':
+                            pub = b''
+                            break
+                    
+                        pub += _d
                 Encryptor, rsa_num = encryption.generate_AESk_fpub(pub)
 
                 len_msg = str(len(rsa_num)).zfill(10).encode()
@@ -464,9 +492,15 @@ class KarayokePage(ctk.CTkFrame):
 
         self.exit_kar.place(anchor="e",relx=0.95,rely=0.07)
 
+    def send_msg_tk(self,Encryptor,sock,msg,code):
+        try:
+            Encryptor.send_msg(sock,msg,code)
+        except ConnectionResetError as err:
+            self.quit()
+    
+    
     def exit_karyoke(self):
         global SOCK,Encryptor
-        self.pause_music()
         self.send_msg_tk(Encryptor,SOCK,"","EXT")
         self.quit()
     
@@ -638,6 +672,13 @@ class KarayokePageNO(ctk.CTkFrame):
 
         self.exit_kar.place(anchor="e",relx=0.95,rely=0.07)
 
+    def send_msg_tk(self,Encryptor,sock,msg,code):
+        try:
+            Encryptor.send_msg(sock,msg,code)
+        except ConnectionResetError as err:
+            self.quit()
+    
+    
     def exit_karyoke(self):
         global SOCK,Encryptor
         self.send_msg_tk(Encryptor,SOCK,"","EXT")
