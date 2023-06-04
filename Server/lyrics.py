@@ -158,14 +158,19 @@ def download_song_lyrics(artist_name, song_name, search_index):
                 return path_file
             except Exception as err:
                 print(err)
-                temp = tempfile.TemporaryDirectory()
-                download_youtube(url, temp.name)
-                fpath = f"{temp.name}\\{os.listdir(temp.name)[0]}"
-                AudioSegment.from_file(fpath).export(
-                    r"Songs/" + f"{artist_name} {song_name}" + ".ogg", format="ogg")
-                os.remove(fpath)
-                temp.cleanup()
-                return f"Songs\\{artist_name} {song_name}.ogg"
+                try:
+                    temp = tempfile.TemporaryDirectory()
+                    download_youtube(url, temp.name)
+                    fpath = f"{temp.name}\\{os.listdir(temp.name)[0]}"
+                    AudioSegment.from_file(fpath).export(
+                        r"Songs/" + f"{artist_name} {song_name}" + ".ogg", format="ogg")
+                    os.remove(fpath)
+                    temp.cleanup()
+                    return f"Songs\\{artist_name} {song_name}.ogg"
+                except Exception as err:
+                    print(err)
+                    
+                    return None
 
         return f"Songs\\{artist_name} {song_name}.ogg"
 

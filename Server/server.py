@@ -15,11 +15,13 @@ FINISH = False
 DATA_BASE = None
 SONG_LOCK = threading.Lock()
 
+PUB_KEY = None
+PRIV_KEY = None
 
 def encrypt_connection(sock: socket.socket):
-    pub, priv = encryption.generate_RSA_keys()
+    global PUB_KEY,PRIV_KEY
+    pub, priv = PUB_KEY,PRIV_KEY    #encryption.generate_RSA_keys()
 
-    print("RSA keys created!")
 
     len_msg = str(len(pub)).zfill(10).encode()
     sock.send(len_msg + b'PUB' + pub)
@@ -187,7 +189,11 @@ def song_search_loop(sock: socket.socket, encryptor: encryption.AESCipher):
 
                 lyrics = get_lyr(f"SongsDetails\\{artist} {song}\\lyrics.txt")
                 encryptor.send_msg(sock, lyrics, "LYC")
-
+            else:
+                encryptor.send_msg(sock, "", "ERS")
+                
+            
+            
         elif code == "EXT":
             return True
 
@@ -213,32 +219,67 @@ def handle_client(sock: socket.socket, id: int):
         print(err)
 
 
+def finish_threads():
+    print("Started Close Thread")
+    global threads,FINISH
+    data = ""
+    while data != "stop":
+        data = input()
+    FINISH = True
+
+
 def main():
-    global FINISH
-    global DATA_BASE
+    global FINISH,DATA_BASE,PUB_KEY,PRIV_KEY
 
     DATA_BASE = DataBase()
+    print("Connected to Data Base!")
+
+    PUB_KEY,PRIV_KEY = encryption.generate_RSA_keys()
+    print("RSA keys created!")
 
     sock = socket.socket()
+    sock.settimeout(4.0)
     port = 12000
 
     sock.bind(('0.0.0.0', port))
     sock.listen(5)
 
-    threads = []
+    stop_th = threading.Thread(target=finish_threads)
+    stop_th.start()
+    
+    threads = {}
 
-    print("waiting for clients!")
+    print("Waiting for clients!")
 
     i = 1
 
     while not FINISH:
-        cli, addr = sock.accept()
-        print(addr, "connected")
-        t = threading.Thread(target=handle_client, args=[cli, i])
-        t.start()
-        threads.append([t, cli])
-        i += 1
+        try:
+            cli, addr = sock.accept()
+            print(addr, "connected")
+            t = threading.Thread(target=handle_client, args=[cli, i])
+            t.start()
+            threads[i] = [t, cli]
+            i += 1
+        except socket.timeout:
+            pass
+    
+    
+    for j in threads.keys():
+        try:
+            threads[j][1].close()
+        except Exception:
+            """Socket closed"""
+        
+        threads[j][0].join(timeout=0.2)
+        
+        if threads[j][0].is_alive():
+            threads[j][0].daemon = True
 
+        print(f"closed Socket and Thread of client {j}")
+        
+    
+    stop_th.join()
 
 if __name__ == '__main__':
     main()

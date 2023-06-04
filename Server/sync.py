@@ -121,7 +121,6 @@ def detect_start(noise_time, path: str):
 
 
 def auto_sync_lyrics(artist, song):
-    print("got here")
     separate_song(artist, song)
 
     segments = get_segments(f"SongsDetails\\{artist} {song}\\vocals.mp3")
