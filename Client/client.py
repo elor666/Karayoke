@@ -74,7 +74,7 @@ class ConnectPage(ctk.CTkFrame):
                 "Roboto", 100), text_color="#7B2869")
         title_label.place(anchor='n', relx=0.5, rely=0.1)
 
-        ip_entry = ctk.CTkEntry(
+        self.ip_entry = ctk.CTkEntry(
             self,
             placeholder_text="IP",
             width=280,
@@ -83,9 +83,9 @@ class ConnectPage(ctk.CTkFrame):
             font=(
                 "Roboto",
                 21))
-        ip_entry.place(anchor='center', relx=0.5, rely=0.3)
+        self.ip_entry.place(anchor='center', relx=0.5, rely=0.3)
 
-        port_entry = ctk.CTkEntry(
+        self.port_entry = ctk.CTkEntry(
             self,
             placeholder_text="PORT",
             width=280,
@@ -94,14 +94,12 @@ class ConnectPage(ctk.CTkFrame):
             font=(
                 "Roboto",
                 21))
-        port_entry.place(anchor='center', relx=0.5, rely=0.4)
+        self.port_entry.place(anchor='center', relx=0.5, rely=0.4)
 
         self.connect_button = ctk.CTkButton(
             self,
             command=lambda: self.connect_server(
-                master,
-                ip_entry,
-                port_entry),
+                master),
             text="Connect",
             fg_color="#7B2869",
             width=280,
@@ -110,10 +108,12 @@ class ConnectPage(ctk.CTkFrame):
 
         self.connect_button.place(anchor='n', relx=0.5, rely=0.5)
 
-    def connect_server(self, root: ctk.CTk, ip_entry, port_entry):
+    def connect_server(self, root: ctk.CTk):
         self.connect_button.configure(state=ctk.DISABLED, fg_color="#808080")
-        ip = ip_entry.get()
-        port = port_entry.get()
+        self.ip_entry.configure(state=ctk.DISABLED)
+        self.port_entry.configure(state=ctk.DISABLED)
+        ip = self.ip_entry.get()
+        port = self.port_entry.get()
 
         if port.isdigit() and all(ch in "1234567890." for ch in ip):
             connection_thread = threading.Thread(
@@ -122,6 +122,10 @@ class ConnectPage(ctk.CTkFrame):
             root.after(2000, self.conclude_connection, root, connection_thread)
         else:
             print("Error")
+        
+            self.connect_button.configure(state=ctk.NORMAL, fg_color="#7B2869")
+            self.ip_entry.configure(state=ctk.NORMAL)
+            self.port_entry.configure(state=ctk.NORMAL)
 
     def conclude_connection(self, root, thread: threading.Thread):
         global Encryptor
@@ -132,6 +136,8 @@ class ConnectPage(ctk.CTkFrame):
         else:
             print("thread ended")
             self.connect_button.configure(state=ctk.NORMAL, fg_color="#7B2869")
+            self.ip_entry.configure(state=ctk.NORMAL,placeholder_text_color="#C85C8E")
+            self.port_entry.configure(state=ctk.NORMAL,placeholder_text_color="#C85C8E")
             if Encryptor is not None:
                 print("connected to server with", Encryptor)
                 root.switch_frame(LoginPage)
@@ -178,6 +184,9 @@ class ConnectPage(ctk.CTkFrame):
 
                 len_msg = str(len(rsa_num)).zfill(10).encode()
                 self.sock.send(len_msg + b'PUB' + rsa_num)
+                
+        except ConnectionResetError:
+            self.quit()
         except BaseException:
             print("Server not found")
             Encryptor = None
@@ -216,7 +225,7 @@ class LoginPage(ctk.CTkFrame):
                 "Roboto",
                 21))
         self.user_entry.place(anchor='center', relx=0.5, rely=0.3)
-        self.user_entry.get()
+        #self.user_entry.get()
 
         self.password_entry = ctk.CTkEntry(
             self,
@@ -229,7 +238,7 @@ class LoginPage(ctk.CTkFrame):
                 21),
             show="*")
         self.password_entry.place(anchor='center', relx=0.5, rely=0.4)
-        self.password_entry.get()
+        #self.password_entry.get()
 
         self.login_button = ctk.CTkButton(
             self,
@@ -240,8 +249,6 @@ class LoginPage(ctk.CTkFrame):
             hover_color="#9D3C72",
             command=lambda: self.connect_server(
                 master,
-                self.user_entry,
-                self.password_entry,
                 "Login"))
         self.login_button.place(anchor='w', relx=0.51, rely=0.5)
         self.register_button = ctk.CTkButton(
@@ -253,8 +260,6 @@ class LoginPage(ctk.CTkFrame):
             hover_color="#9D3C72",
             command=lambda: self.connect_server(
                 master,
-                self.user_entry,
-                self.password_entry,
                 "Register"))
         self.register_button.place(anchor='e', relx=0.49, rely=0.5)
         
@@ -262,20 +267,19 @@ class LoginPage(ctk.CTkFrame):
     def send_msg_tk(self, Encryptor: encryption.AESCipher, sock, msg, code):
         try:
             Encryptor.send_msg(sock, msg, code)
-        except ConnectionResetError as err:
+        except ConnectionResetError:
             self.quit()
 
-    def connect_server(self, root, user_entry, password_entry, state):
-        user_entry.configure(state=ctk.DISABLED)
-        password_entry.configure(state=ctk.DISABLED)
-
-        password = password_entry.get()
-        user = user_entry.get()
+    def connect_server(self, root, state):
+        self.disable_buttons()
+        
+        password = self.password_entry.get()
+        user = self.user_entry.get()
+        
         if not password == "" and not user == "":
             password = hashlib.sha1(password.encode()).hexdigest()
 
             if all(ch not in "#" for ch in user):
-                self.disable_buttons()
                 connection_thread = threading.Thread(
                     target=self.try_connection, args=(
                         user, password, state))
@@ -287,23 +291,25 @@ class LoginPage(ctk.CTkFrame):
                     connection_thread)
             else:
                 print('error')
-
-        user_entry.configure(state=ctk.NORMAL)
-        password_entry.configure(state=ctk.NORMAL)
+                self.enable_buttons()
+        else:
+            self.enable_buttons()
 
     def try_connection(self, user, password, state):
-        global Encryptor
-        global SOCK
+        global Encryptor,SOCK
 
         if state == "Register":
             cod = "REG"
         else:
             cod = "LOG"
         self.send_msg_tk(Encryptor, SOCK, user + "#" + password, cod)
-
-        code, msg = Encryptor.recieve_msg(SOCK)
-        if code == "SUC":
-            self.LOGGED = True
+        
+        try:
+            code, msg = Encryptor.recieve_msg(SOCK)
+            if code == "SUC":
+                self.LOGGED = True
+        except ConnectionResetError:
+            self.quit()
 
     def conclude_connection(self, root, thread: threading.Thread):
         thread.join(timeout=0.2)
@@ -320,10 +326,15 @@ class LoginPage(ctk.CTkFrame):
     def disable_buttons(self):
         self.login_button.configure(state="disabled", fg_color="#808080")
         self.register_button.configure(state="disabled", fg_color="#808080")
+        self.user_entry.configure(state="disabled")
+        self.password_entry.configure(state="disabled")
+        
 
     def enable_buttons(self):
         self.login_button.configure(state="normal", fg_color="#7B2869")
         self.register_button.configure(state="normal", fg_color="#7B2869")
+        self.user_entry.configure(state="normal")
+        self.password_entry.configure(state="normal")
 
 
 class SearchPage(ctk.CTkFrame):
@@ -502,7 +513,10 @@ class SearchPage(ctk.CTkFrame):
                     root.switch_frame(KarayokePageNO)
 
     def get_lst_songs(self):
-        code, msg = Encryptor.recieve_msg(SOCK)
+        try:
+            code, msg = Encryptor.recieve_msg(SOCK)
+        except ConnectionResetError:
+            self.quit()
         try:
             if code == "SCH":
                 msg = base64.b64decode(msg)
@@ -540,6 +554,9 @@ class SearchPage(ctk.CTkFrame):
             if code == "RES":
                 msg = base64.b64decode(msg)
                 SONG = pickle.loads(msg)
+            elif code == "ERS":
+                self.FINISH = False
+                return
             else:
                 raise Exception("ErrorRES")
             code, msg = Encryptor.recieve_msg(SOCK)
@@ -567,16 +584,28 @@ class SearchPage(ctk.CTkFrame):
                 raise Exception("ErrorLYRICS")
 
             self.FINISH = True
+        except ConnectionResetError:
+            self.quit()
         except Exception as err:
             print(err)
 
     def disable_buttons(self):
         self.search_button.configure(state="disabled", fg_color="#808080")
         self.play_button.configure(state="disabled", fg_color="#808080")
+        self.artist_entry.configure(state="disabled")
+        self.song_entry.configure(state="disabled")
+        self.auto_check.configure(state="disabled", fg_color="#808080")
+        self.vocals_check.configure(state="disabled", fg_color="#808080")
+        self.songs_menu.configure(state="disabled",fg_color="#808080")
 
     def enable_buttons(self):
         self.search_button.configure(state="normal", fg_color="#9D3C72")
         self.play_button.configure(state="normal", fg_color="#7B2869")
+        self.artist_entry.configure(state="normal")
+        self.song_entry.configure(state="normal")
+        self.auto_check.configure(state="normal",fg_color="#7B2869")
+        self.vocals_check.configure(state="normal",fg_color="#7B2869")
+        self.songs_menu.configure(state="normal",fg_color="#7B2869")
 
 
 class KarayokePage(ctk.CTkFrame):
